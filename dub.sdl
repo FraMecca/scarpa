@@ -1,0 +1,11 @@
+name "scarpa"
+description "Web scraper"
+authors "franceschi"
+copyright "Copyright © 2018, franceschi"
+license "GPLv3"
+
+dependency "sumtype" version="*"
+dependency "requests" version="*"
+dependency "arrogant" version="~>0.2.0"
+
+/*libs "modest"*/

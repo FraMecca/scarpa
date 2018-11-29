@@ -1,0 +1,14 @@
+.dub
+docs.json
+__dummy.html
+docs/
+scarpa.so
+scarpa.dylib
+scarpa.dll
+scarpa.a
+scarpa.lib
+scarpa-test-*
+*.exe
+*.o
+*.obj
+*.lst
