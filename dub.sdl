@@ -7,5 +7,4 @@ license "GPLv3"
 dependency "sumtype" version="*"
 dependency "requests" version="*"
 dependency "arrogant" version="~>0.2.0"
-
-/*libs "modest"*/
+dependency "ddash" version="~>0.0.6"

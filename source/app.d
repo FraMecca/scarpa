@@ -1,8 +1,9 @@
-import std.stdio;
 import sumtype;
 import requests;
 import arrogant;
+import ddash.functional;
 
+import std.stdio;
 import std.range;
 import std.array;
 import std.string;
@@ -12,6 +13,11 @@ import std.algorithm.mutation;
 import std.conv : to;
 
 alias Event = SumType!(RequestEvent, ParseEvent, ToFileEvent);
+alias resolve = match!(
+                       (RequestEvent _ev) => _ev.resolve,
+                       (ParseEvent _ev) => _ev.resolve,
+                       (ToFileEvent _ev) => _ev.resolve,
+                       );
 
 enum scopeInvariant = "assert(resolved == false); scope(success) resolved = true;";
 /**
@@ -29,16 +35,10 @@ void main()
 	Event req = RequestEvent("http://fragal.eu");
 	list ~= req;
 
-	foreach(rq; list) {
-		//req.resolve.each!((ParseEvent r) => r.resolve());
-		foreach(r; rq.resolve) {
-			r.tryMatch!(
-					(ParseEvent q) => list ~= q.resolve,
-					(ToFileEvent t) => t.resolve
-					);
-		}
-		list.popFront();
-	}
+    while(!list.empty){
+        auto ev = list.front; list.popFront;
+        list ~= ev.resolve;
+    }
 }
 
 struct RequestEvent {
@@ -48,7 +48,7 @@ struct RequestEvent {
 
 	this(const string url) @safe
 	{
-		m_url = url;
+		m_url = url.endsWith("/") ? url : url ~ "/";
 	}
 
 	Event[] resolve()
@@ -59,7 +59,7 @@ struct RequestEvent {
 		auto content = getContent(m_url);
 		//writeln(content);
 
-		Event parser = ParseEvent(content.to!string);
+		Event parser = ParseEvent(content.to!string, m_url);
 		res ~= parser;
 		return res;
 	}
@@ -68,11 +68,14 @@ struct RequestEvent {
 struct ParseEvent {
 
 	private immutable string m_content;
+	private immutable string m_rooturl;
 	bool resolved = false;
 
-	this(const string content) @safe
+	this(const string content, const string root) @safe
 	{
+        assert(root.endsWith("/"), root);
 		m_content = content;
+        m_rooturl = root[0 .. $-1];
 	}
 
 	Event[] resolve()
@@ -80,57 +83,70 @@ struct ParseEvent {
 		mixin(scopeInvariant);
 
 		Event[] res;
-		void append(string s)
-		{
-			Event e = RequestEvent(s);
-			res ~= e;
-		}
+		void append(const string src){
+            if(src.startsWith("/")){
+                Event e = RequestEvent(m_rooturl ~ src);
+                res ~= e;
+            }
+            else{
+                Event e = RequestEvent(src);
+                res ~= e;
+            }
+        }
 
-		auto arrogant = Arrogant();
+        auto arrogant = Arrogant();
    		auto tree = arrogant.parse(m_content);
 
 		// TODO other tags
 		tree.byTagName("a")
 			.filter!((e) => !e["href"].isNull)
-			.each!((e) => append(e["href"]));
+			.each!((e) => append(e["href"])); // could be tee
 
+        foreach(ref e; tree.byTagName("a")){
+            e.formatUri; // CAN'T replace occurences TODO
+        }
+        Event e = ToFileEvent(m_content, m_rooturl);
+        res ~= e;
 		return res;
 	}
 }
+void formatUri(/*ref T dst,*/ ref Node uri) // TODO file appender ? iopipe ?
+{
+    if(e["href"].isNull)
+        return
+
+    enum rootPath = "/tmp/data/"; // TODO
+    // auto dst = appender!string;
+    // dst.put(uri.cond!(
+    uri["href"] = uri["href"].cond!(
+          u => u.startsWith("http://"), u => rootPath ~ u.stripLeft("http://"),
+          u => u.startsWith("https://"), u => rootPath ~ u.stripLeft("https://"),
+          u => u.startsWith("/"), u => rootPath ~ u.stripLeft("/"),
+          u => u
+    );
+    writeln(uri["href"] ~ "asd");
+}
+
 
 struct ToFileEvent {
 
 	private immutable string m_content;
+    private immutable string m_rooturl;
 	bool resolved = false;
 
-	this(const string content) @safe
+	this(const string content, const string url) @safe
 	{
 		m_content = content;
+        m_rooturl = url;
 	}
 
 	Event[] resolve()
 	{
+        writeln(this);
  		mixin(scopeInvariant);
 		Event[] res;
 
-		void formatURI(/*ref T dst,*/ string uri) // TODO file appender ? iopipe ?
-		{
-			string rootPath = "/tmp/data/"; // TODO
-			auto dst = appender!string;
-
-			if(uri.beginsWith("http://")) {
-				dst.put(rootPath ~ uri.stripLeft("http://"));
-			} else if(uri.beginsWith("https://")) {
-				dst.put(rootPath ~ uri.stripLeft("https://"));
-			} else if(uri.beginsWith("/")) {
-				dst.put(rootPath ~ uri.stripLeft("/")); // TODO add original folder
-			} else {
-				dst.put(uri);
-			}
-			writeln(dst.data);
-		}
-
-		m_content.each!(e => formatURI(e["href"]));
-		return res; // TODO dbevent
+        assert (false);
+		// return res; // TODO dbevent
 	}
 }
