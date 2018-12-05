@@ -44,7 +44,7 @@ struct RequestEvent {
 
 	this(const string url, const string projdir) @safe
 	{
-		m_url = url.endsWith("/") ? url : url ~ "/";
+		m_url = url;
         m_projdir = projdir;
 	}
 
