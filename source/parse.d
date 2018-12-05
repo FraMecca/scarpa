@@ -1,12 +1,15 @@
 module parse;
 
 import scarpa;
+import config : config;
 
-// import fluent.asserts;
+import requests;
 import ddash.functional;
+import sumtype;
 
 import std.string;
 import std.typecons;
+import std.variant;
 
 alias ParseResult = Tuple!(string, "url", string, "fname");
 alias parseResult = tuple!("url", "fname");
@@ -25,19 +28,19 @@ do{
     assert(rooturl);
     string src, dst;
     // write full path in case of relative urls
-    src = tuple!("url", "root")(url, absRooturl).cond!(
-          t => t.url.startsWith("/"), t => t.cond!(
-                t => t.root.endsWith("/"), t => t.root[0..$-1] ~ t.url,
-                t => t.root ~ t.url), // stripped trailing /
-          t => t.url
-    );
+	src = url.cond!(
+		  u => u.startsWith("/"), u => absRooturl.cond!(
+				a => a.endsWith("/"), a => a[0..$-1] ~ u,
+				a => a ~ u), // stripped trailing /
+	      u => u
+	);
 
     // write filename on disk
-    dst = tuple!("url", "fpath")(url, rooturl).cond!(
-          t => t.url.startsWith("http://"), t => t.url.stripLeft("http://"),
-          t => t.url.startsWith("https://"), t => t.url.stripLeft("https://"),
-          t => t.url.startsWith("/"), t => t.fpath ~ t.url.stripLeft("/"),
-          t => t.url
+    dst = url.cond!(
+          u => u.startsWith("http://"), u => u.stripLeft("http://"),
+          u => u.startsWith("https://"), u => u.stripLeft("https://"),
+          u => u.startsWith("/"), u => rooturl ~ u.stripLeft("/"),
+          u => u
     );
     return parseResult(src, dst);
 }
@@ -53,26 +56,36 @@ unittest{
     assert(p == parseResult("http://example.com/about", "example.com/about"), p.to!string);
 }
 
-Event requestUrl(const string url, const string projdir) @safe
+
+private bool isHTMLFile(string[string] headers)
 {
-    import requests;
-    import std.conv : to;
-    import std.utf ;
-
-    auto rawdata = () @trusted { return getContent(url).data; } ();
-
-    // Event ev = try_!(assumeUTF)(rawdata)
-    //     .match!(
-    //         (string content) => ParseEvent(content, url, projdir),
-    //         (UTFException e) => ToFileEvent(rawdata, url, projdir));
-    
-    try{
-        string content = rawdata.assumeUTF;
-        Event ev= ParseEvent(content, url, projdir);
-        return ev;
-    }catch(const UTFException e){
-        Event ev = ToFileEvent(rawdata, url, projdir);
-        return ev;
-    }
+	import std.conv : to;
+	return "Content-Length" in headers &&
+			headers["Content-Length"].to!ulong < config.maxResSize &&
+			"Content-Type" in headers &&
+			headers["Content-Type"] == "text/html";
 }
 
+SumType!(ReceiveAsRange, string) requestUrl(const string url) @trusted
+{
+    import std.utf ;
+	import std.array : appender;
+	import std.algorithm.iteration;
+
+	typeof(return) ret;
+
+
+	auto rq = Request();
+	rq.useStreaming = true;
+	auto rs = rq.get(url);
+	auto resBody = appender!(string);
+
+	if (rs.responseHeaders.isHTMLFile) {
+		rs.receiveAsRange().each!(e => resBody.put(e));
+		ret = resBody.data;
+	} else {
+		ret = rs.receiveAsRange();
+	}
+
+	return ret;
+}

@@ -4,9 +4,15 @@ authors "franceschi"
 copyright "Copyright © 2018, franceschi"
 license "GPLv3"
 
+dependency "vibe-core" version="*"
 dependency "sumtype" version="*"
 dependency "requests" version="*"
 dependency "arrogant" version="~>0.2.0"
-dependency "ddash" version="~>0.0.6"
+dependency "ddash" version="~master"
 dependency "d2sqlite3" version="~>0.18.1"
 dependency "io" version="*"
+
+configuration "application" {
+	targetType "executable"
+	mainSourceFile "source/scarpa.d"
+}
