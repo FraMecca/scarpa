@@ -53,10 +53,8 @@ struct RequestEvent {
 		Event[] res;
 		mixin(scopeInvariant);
 		// fetch request content
-		string content = () @trusted { return getContent(m_url).data; }().assumeUTF;
-
-		Event parser = ParseEvent(content, m_url, m_projdir);
-		res ~= parser;
+        Event ev = requestUrl(m_url, m_projdir);
+		res ~= ev;
 		return res;
 	}
 
@@ -120,8 +118,16 @@ struct ToFileEvent {
         m_projdir = projdir;
 	}
 
+	this(const ubyte[] content, const string url, const string projdir) @safe
+	{
+        assert(false);
+        // m_rooturl = url;
+        // m_projdir = projdir;
+	}
+
 	Event[] resolve() @safe
 	{
+        import std.io;
  		mixin(scopeInvariant);
 		Event[] res;
         // auto fp = File(m_projdir, mode!"w");
