@@ -1,17 +1,10 @@
+module scarpa;
+
 import sumtype;
-import requests;
-import arrogant;
 import ddash.functional;
-import std.io;
 
 import std.stdio : writeln;
 import std.range;
-import std.array;
-import std.string;
-import std.typecons;
-import std.algorithm.iteration;
-import std.algorithm.searching;
-import std.algorithm.mutation;
 import std.conv : to;
 
 import parse;
@@ -79,20 +72,20 @@ struct ParseEvent {
 
 	this(const string content, const string root, const string projdir) @safe
 	{
-        assert(root.endsWith("/"), root);
 		m_content = content;
-        m_rooturl = root;
+        m_rooturl = root; // the url of the page requested
         m_projdir = projdir;
 	}
 
 	Event[] resolve() @trusted// TODO safe 
 	{
+        import arrogant;
 		mixin(scopeInvariant);
 
 		Event[] res;
 
-        auto arrogant = Arrogant();
-   		auto tree = arrogant.parse(m_content);
+        auto arrogantt = Arrogant();
+   		auto tree = arrogantt.parse(m_content);
 
 		// TODO other tags and js and css
         foreach(ref node; tree.byTagName("a")){
