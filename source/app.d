@@ -27,7 +27,7 @@ events:
 void main()
 {
 	Event[] list;
-	Event req = RequestEvent("http://fragal.eu", "test/");
+	Event req = RequestEvent("http://fragal.eu/cv.pdf", "test/");
 	list ~= req;
 
     while(!list.empty){

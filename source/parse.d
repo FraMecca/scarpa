@@ -12,8 +12,9 @@ alias ParseResult = Tuple!(string, "url", string, "fname");
 alias parseResult = tuple!("url", "fname");
 ParseResult parseUrl(const string url, const string absRooturl)
 in{
-    assert(absRooturl.endsWith("/"), absRooturl);
     assert(absRooturl.startsWith("http://") || absRooturl.startsWith("https://"), absRooturl);
+    assert(url.startsWith("http://") || url.startsWith("https://")
+           || url.startsWith("/"), url);
 }
 do{
 
@@ -25,7 +26,9 @@ do{
     string src, dst;
     // write full path in case of relative urls
     src = tuple!("url", "root")(url, absRooturl).cond!(
-          t => t.url.startsWith("/"), t => t.root[0..$-1] ~ t.url,
+          t => t.url.startsWith("/"), t => t.cond!(
+                t => t.root.endsWith("/"), t => t.root[0..$-1] ~ t.url,
+                t => t.root ~ t.url), // stripped trailing /
           t => t.url
     );
 
