@@ -21,10 +21,11 @@ in{
 }
 do{
 
-    string rooturl = absRooturl.cond!(
-          u => u.startsWith("http://"), u => u.stripLeft("http://"),
-          u => u.startsWith("https://"), u => u.stripLeft("https://"),
-          "");
+    //string rooturl = absRooturl.cond!(
+          //u => u.startsWith("http://"), u => u.stripLeft("http://"),
+          //u => u.startsWith("https://"), u => u.stripLeft("https://"),
+          //"");
+	string rooturl = absRooturl.toFileName("", false);
     assert(rooturl);
     string src, dst;
     // write full path in case of relative urls
@@ -36,16 +37,40 @@ do{
 	);
 
     // write filename on disk
-    dst = url.cond!(
-          u => u.startsWith("http://"), u => u.stripLeft("http://"),
-          u => u.startsWith("https://"), u => u.stripLeft("https://"),
-          u => u.startsWith("/"), u => rooturl ~ u.stripLeft("/"),
-          u => u
-    );
+	dst = toFileName(url, rooturl, false);
     return parseResult(src, dst);
 }
 
+string toFileName(const string url, const string absRooturl = "", const bool addIndex = true) @safe
+{
+	string rooturl, dst;
+	if(!absRooturl.empty) {
+		rooturl = absRooturl.toFileName("", false);
+		if(!rooturl.endsWith("/")) rooturl ~= "/";
+	}
+
+	if(addIndex) {
+		dst = dst.cond!(
+			d => d.count("/") == 2, d => d ~= "/index.html",
+			d => d.endsWith("/"), d => d ~= "index.html",
+			d => d
+		);
+		import vibe.core.log;
+		logWarn("%s, %s, %s, %d", url, absRooturl, dst, dst.count('/'));
+	}
+
+	dst = url.cond!(
+		  u => u.startsWith("http://"), u => u.stripLeft("http://"),
+		  u => u.startsWith("https://"), u => u.stripLeft("https://"),
+		  u => u.startsWith("/"), u => rooturl ~ u.stripLeft("/"),
+		  u => u
+	);
+
+	return dst;
+}
+
 unittest{
+	import std.conv : to;
     auto p = parseUrl("/about", "http://fragal.eu/");
     assert(p == parseResult("http://fragal.eu/about", "fragal.eu/about"), p.to!string);
 
@@ -54,16 +79,18 @@ unittest{
 
     p = parseUrl("http://example.com/about", "http://fragal.eu/");
     assert(p == parseResult("http://example.com/about", "example.com/about"), p.to!string);
+
+	assert("https://fragal.eu/".toFileName == "fragal.eu/index.html");
+	assert("https://fragal.eu".toFileName == "fragal.eu/index.html");
 }
 
 
 private bool isHTMLFile(string[string] headers)
 {
-	import std.conv : to;
-	return "Content-Length" in headers &&
-			headers["Content-Length"].to!ulong < config.maxResSize &&
-			"Content-Type" in headers &&
-			headers["Content-Type"] == "text/html";
+	return /*"content-length" in headers &&*/ // TODO investigate
+			//headers["content-length"].to!ulong < config.maxResSize &&
+		    "content-type" in headers &&
+			headers["content-type"] == "text/html";
 }
 
 SumType!(ReceiveAsRange, string) requestUrl(const string url) @trusted
