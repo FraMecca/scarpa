@@ -12,7 +12,14 @@ dependency "ddash" version="~master"
 dependency "d2sqlite3" version="~>0.18.1"
 dependency "io" version="*"
 
+lflags "-lmagic"
+
 configuration "application" {
+	targetType "executable"
+	mainSourceFile "source/scarpa.d"
+}
+
+configuration "unittest" {
 	targetType "executable"
 	mainSourceFile "source/scarpa.d"
 }
