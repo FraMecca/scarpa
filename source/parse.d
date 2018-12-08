@@ -3,6 +3,7 @@ module parse;
 import scarpa;
 import config : config;
 
+import vibe.core.log;
 import requests;
 import ddash.functional;
 import sumtype;
@@ -16,8 +17,7 @@ alias parseResult = tuple!("url", "fname");
 ParseResult parseUrl(const string url, const string absRooturl)
 in{
     assert(absRooturl.startsWith("http://") || absRooturl.startsWith("https://"), absRooturl);
-    assert(url.startsWith("http://") || url.startsWith("https://")
-           || url.startsWith("/"), url);
+    assert(url.startsWith("http://") || url.startsWith("https://") || url.startsWith("/"), url);
 }
 do{
 
@@ -50,16 +50,16 @@ string toFileName(const string url, const string absRooturl = "", const bool add
 	}
 
 	if(addIndex) {
-		dst = dst.cond!(
-			d => d.count("/") == 2, d => d ~= "/index.html",
-			d => d.endsWith("/"), d => d ~= "index.html",
+		dst = url.cond!(
+			u => u.count("/") == 2, u => u ~ "/index.html",
+			u => u.endsWith("/"), u => u ~ "index.html",
 			d => d
 		);
-		import vibe.core.log;
-		logWarn("%s, %s, %s, %d", url, absRooturl, dst, dst.count('/'));
+	} else {
+		dst = url;
 	}
 
-	dst = url.cond!(
+	dst = dst.cond!(
 		  u => u.startsWith("http://"), u => u.stripLeft("http://"),
 		  u => u.startsWith("https://"), u => u.stripLeft("https://"),
 		  u => u.startsWith("/"), u => rooturl ~ u.stripLeft("/"),
@@ -84,13 +84,13 @@ unittest{
 	assert("https://fragal.eu".toFileName == "fragal.eu/index.html");
 }
 
-
 private bool isHTMLFile(string[string] headers)
 {
 	return /*"content-length" in headers &&*/ // TODO investigate
 			//headers["content-length"].to!ulong < config.maxResSize &&
 		    "content-type" in headers &&
-			headers["content-type"] == "text/html";
+			(headers["content-type"] == "text/html" ||
+			headers["content-type"].startsWith("text/html;"));
 }
 
 SumType!(ReceiveAsRange, string) requestUrl(const string url) @trusted
@@ -115,4 +115,40 @@ SumType!(ReceiveAsRange, string) requestUrl(const string url) @trusted
 	}
 
 	return ret;
+}
+
+void makeDir(const string path)
+{
+	import std.file : mkdirRecurse;
+	import std.string : lastIndexOf;
+
+	auto dir = path[0..(path.lastIndexOf('/'))];
+	logInfo("Creating dir: %s", dir);
+
+	dir.mkdirRecurse;
+
+	handleFileError(path);
+}
+
+/** handle cases in which:
+  * 1. a html file was saved, but it is a directory (returns DIR/index.html)
+  * 2. a directory exists and a html file with the same name is present (returns DIR/index.html)
+  * throws if file is not HTML OR is POSIX special file
+*/
+string handleFileError(const string path)
+{
+	import std.file;
+	//import magic;
+
+
+	//m.load("/usr/share/misc/magic.mgc");
+
+	//auto type = m.file(path);
+	
+	//logWarn("%s: %s", path, type);
+	//path.cond!(
+			//p => p.isFile && m.file(p) == "text/html",
+
+	// case 1
+
 }

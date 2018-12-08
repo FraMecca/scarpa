@@ -12,6 +12,7 @@ import std.conv : to;
 import std.uuid;
 import std.variant;
 import std.typecons;
+import std.string;
 
 import parse;
 
@@ -148,10 +149,13 @@ struct ToFileEvent
 
 		string fname = m_projdir ~ m_rooturl.toFileName();
 		logWarn(fname);
+
+		fname.makeDir();
+
 		m_content.match!(
 				(string s) {
 						auto fp = File(fname, mode!"w");
-						fp.write(s.to!(ubyte[]));
+						fp.write(s.representation);
 					},
 				(ReceiveAsRange r) {
 						import std.algorithm.iteration;
