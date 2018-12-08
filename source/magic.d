@@ -1,14 +1,15 @@
 // wrap libmagic
+import vibe.core.log;
 import std.string;
 import std.exception : enforce;
 
 string magicType(const string path)
 {
 	char[32] dst;
-	auto rc = magic_type(path.toStringz, dst.ptr);
+	auto rc = magic_type(path.toStringz, dst);
 	if(rc == 1) enforce(false, "Unable to initialize libmagic");
 	else if(rc == 2) enforce(false, "Unable to load magic MIME db");
-	return cast(string)dst.ptr.fromStringz;
+	return cast(string)dst.dup;
 }
 
 extern (C) {
@@ -36,9 +37,9 @@ enum MAGIC_MIME = MAGIC_MIME_TYPE | MAGIC_MIME_ENCODING;
 magic_t magic_open(int flags);
 void magic_close(magic_t ms);
 int magic_load(magic_t ms, in char *path);
-immutable(char) *magic_file(magic_t ms, in char *path);
+ref char[32] magic_file(magic_t ms, in char *path);
 
-int magic_type(const char* path, char* dst)
+int magic_type(const char* path, ref char[32] dst)
 {
 	magic_t magic_cookie;
 

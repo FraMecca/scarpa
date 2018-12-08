@@ -1,5 +1,7 @@
 module scarpa;
 
+import parse;
+
 import sumtype;
 import ddash.functional;
 import vibe.core.log;
@@ -13,8 +15,10 @@ import std.uuid;
 import std.variant;
 import std.typecons;
 import std.string;
+import std.algorithm.iteration;
+import std.file;
 
-import parse;
+// TODO handle update / existing files
 
 alias ID = Nullable!UUID;
 alias Event = SumType!(RequestEvent, HTMLEvent, ToFileEvent);
@@ -150,17 +154,24 @@ struct ToFileEvent
 		string fname = m_projdir ~ m_rooturl.toFileName();
 		logWarn(fname);
 
+
 		fname.makeDir();
+
+		if(fname.exists) {
+			fname.cond!(
+				f => f.isDir, (f) { fname = handleDirExists(f); },
+				{ throw new Exception("Special file"); }
+				);
+		}
 
 		m_content.match!(
 				(string s) {
-						auto fp = File(fname, mode!"w");
-						fp.write(s.representation);
+					auto fp = File(fname, mode!"w");
+					fp.write(s.representation);
 					},
 				(ReceiveAsRange r) {
-						import std.algorithm.iteration;
-						auto fp = File(fname, mode!"wb");
-						r.each!((e) => fp.write(e));
+					auto fp = File(fname, mode!"wb");
+					r.each!((e) => fp.write(e));
 					// TODO check file type in case of binary
 					}
 				);

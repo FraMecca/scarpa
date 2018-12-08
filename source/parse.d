@@ -8,6 +8,8 @@ import requests;
 import ddash.functional;
 import sumtype;
 
+import std.file;
+import std.exception;
 import std.string;
 import std.typecons;
 import std.variant;
@@ -123,32 +125,42 @@ void makeDir(const string path)
 	import std.string : lastIndexOf;
 
 	auto dir = path[0..(path.lastIndexOf('/'))];
-	logInfo("Creating dir: %s", dir);
-
-	dir.mkdirRecurse;
-
-	handleFileError(path);
+	dir.cond!(
+		d => d.exists && d.isFile, d => handleFileExists(d),
+		d => d.exists && !d.isDir, { throw new Exception("Special file"); },
+		d => d.mkdirRecurse
+	);
 }
 
 /** handle cases in which:
-  * 1. a html file was saved, but it is a directory (returns DIR/index.html)
-  * 2. a directory exists and a html file with the same name is present (returns DIR/index.html)
+  * 1. a html file was saved, but a directory has to be created
+  * Moves the file to DIR/index.html, creating DIR
   * throws if file is not HTML OR is POSIX special file
 */
-string handleFileError(const string path)
-{
-	import std.file;
-	//import magic;
+void handleFileExists(const string path)
+in {
+	assert(path.isFile, "Given path is not a file");
+}
+do {
+	import magic;
 
-
-	//m.load("/usr/share/misc/magic.mgc");
-
-	//auto type = m.file(path);
-	
-	//logWarn("%s: %s", path, type);
-	//path.cond!(
-			//p => p.isFile && m.file(p) == "text/html",
-
-	// case 1
-
+	if(path.magicType.startsWith("text/html")) {
+		string tname = "." ~ path[(path.lastIndexOf('/')+1)..$] ~ ".tmp";
+		path.rename(tname);
+		mkdirRecurse(path);
+		tname.rename(path ~ "/index.html");
+	} else {
+		// TODO checks?
+		enforce(false, "Given path is not an HTML file.");
+	}
+}
+/** 2. a directory exists and a html file with the same name has to be written
+  * (returns DIR/index.html)
+*/
+string handleDirExists(const string path)
+in {
+	assert(path.isDir, "Given path is not a directory");
+}
+do {
+	return path ~ "/index.html";
 }
