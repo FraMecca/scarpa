@@ -66,18 +66,21 @@ string toFileName(const string url, const string absRooturl = "", const bool add
 }
 
 unittest{
-	import std.conv : to;
-    auto p = parseUrl("/about", "http://fragal.eu/");
-    assert(p == parseResult("http://fragal.eu/about", "fragal.eu/about"), p.to!string);
-
-    p = parseUrl("http://example.com", "http://fragal.eu/");
-    assert(p == parseResult("http://example.com", "example.com"), p.to!string);
-
-    p = parseUrl("http://example.com/about", "http://fragal.eu/");
-    assert(p == parseResult("http://example.com/about", "example.com/about"), p.to!string);
-
 	assert("https://fragal.eu/".toFileName == "fragal.eu/index.html");
 	assert("https://fragal.eu".toFileName == "fragal.eu/index.html");
+}
+
+string removeAnchor(const string src) @safe
+{
+    auto idx = src.lastIndexOf('#');
+    if(idx <= 0) return src;
+    else return src[0 .. idx];
+}
+
+unittest{
+    assert("http://example.com/p#anchor".removeAnchor == "http://example.com/p");
+    assert("http://example.com/p#anchor/".removeAnchor == "http://example.com/p");
+    assert("http://example.com/#anchor".removeAnchor == "http://example.com/");
 }
 
 private bool isHTMLFile(string[string] headers)
