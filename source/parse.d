@@ -1,17 +1,19 @@
 module parse;
 
 import scarpa;
-import config : config;
+import magic;
+import config;
 
 import vibe.core.log;
 import requests;
 import ddash.functional;
 import sumtype;
 
-import std.file;
-import std.exception;
+// import std.file;
+import std.file : mkdirRecurse, exists, isFile, isDir, rename;
+import std.exception: enforce;
 import std.string;
-import std.typecons;
+import std.typecons : Tuple, tuple;
 
 alias ParseResult = Tuple!(string, "url", string, "fname");
 alias parseResult = tuple!("url", "fname");
@@ -99,7 +101,7 @@ unittest{
     assert("http://example.com/#anchor".removeAnchor == "http://example.com/");
 }
 
-private bool isHTMLFile(string[string] headers)
+bool isHTMLFile(string[string] headers) @safe
 {
 	return /*"content-length" in headers &&*/ // TODO investigate
 			//headers["content-length"].to!ulong < config.maxResSize &&
@@ -110,9 +112,9 @@ private bool isHTMLFile(string[string] headers)
 
 SumType!(ReceiveAsRange, string) requestUrl(const string url) @trusted
 {
-    import std.utf ;
+    import std.utf;
 	import std.array : appender;
-	import std.algorithm.iteration;
+	import std.algorithm.iteration : each;
 
 	typeof(return) ret;
 
@@ -137,7 +139,6 @@ in{
     assert(path.lastIndexOf('/') > 0, path);
 } do
 {
-	import std.file : mkdirRecurse;
 	import std.string : lastIndexOf;
 
 	auto dir = path[0..(path.lastIndexOf('/'))];
@@ -158,17 +159,14 @@ in {
 	assert(path.isFile, "Given path is not a file");
 }
 do {
-	import magic;
 
-	if(path.magicType.startsWith("text/html")) {
-		string tname = "." ~ path[(path.lastIndexOf('/')+1)..$] ~ ".tmp";
-		path.rename(tname);
-		mkdirRecurse(path);
-		tname.rename(path ~ "/index.html");
-	} else {
-		// TODO checks?
-		enforce(false, "Given path is not an HTML file.");
-	}
+	enforce(path.magicType.startsWith("text/html"), "Given path is not an HTML file.");
+
+    string tname = "." ~ path[(path.lastIndexOf('/')+1)..$] ~ ".tmp";
+    path.rename(tname);
+    mkdirRecurse(path);
+    tname.rename(path ~ "/index.html");
+    // TODO checks?
 }
 /** 2. a directory exists and a html file with the same name has to be written
   * (returns DIR/index.html)

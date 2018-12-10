@@ -1,6 +1,6 @@
 // wrap libmagic
 import vibe.core.log;
-import std.string;
+import std.string: toStringz;
 import std.exception : enforce;
 
 string magicType(const string path)
@@ -9,10 +9,10 @@ string magicType(const string path)
 	auto rc = magic_type(path.toStringz, dst);
 	if(rc == 1) enforce(false, "Unable to initialize libmagic");
 	else if(rc == 2) enforce(false, "Unable to load magic MIME db");
-	return cast(string)dst.dup;
+	return cast(string) dst.dup;
 }
 
-extern (C) {
+extern (C):
 @system:
 nothrow:
 
@@ -58,5 +58,3 @@ int magic_type(const char* path, ref char[32] dst)
 	magic_close(magic_cookie);
 	return 0;
 }
-}
-

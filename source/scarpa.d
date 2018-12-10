@@ -9,14 +9,9 @@ import std.io;
 import requests;
 
 import std.stdio : writeln;
-import std.range;
 import std.conv : to;
+import std.typecons : Nullable;
 import std.uuid;
-import std.variant;
-import std.typecons;
-import std.string;
-import std.algorithm.iteration;
-import std.file;
 
 // TODO handle update / existing files
 
@@ -44,6 +39,7 @@ events:
 */
 void main()
 {
+    import std.range;
 	Event[] list;
 	Event req = RequestEvent("http://fragal.eu", "test/");
 	list ~= req;
@@ -168,6 +164,9 @@ struct ToFileEvent
 
 	Event[] resolve() @trusted
 	{
+        import std.algorithm.iteration : each;
+        import std.file : exists, isDir;
+        import std.string : representation;
  		mixin(scopeInvariant);
 		Event[] res;
 
