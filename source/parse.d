@@ -12,7 +12,6 @@ import std.file;
 import std.exception;
 import std.string;
 import std.typecons;
-import std.variant;
 
 alias ParseResult = Tuple!(string, "url", string, "fname");
 alias parseResult = tuple!("url", "fname");
@@ -22,11 +21,6 @@ in{
     assert(url.startsWith("http://") || url.startsWith("https://") || url.startsWith("/"), url);
 }
 do{
-
-    //string rooturl = absRooturl.cond!(
-          //u => u.startsWith("http://"), u => u.stripLeft("http://"),
-          //u => u.startsWith("https://"), u => u.stripLeft("https://"),
-          //"");
 	string rooturl = absRooturl.toFileName("", false);
     assert(rooturl);
     string src, dst;
