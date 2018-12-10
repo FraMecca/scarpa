@@ -30,14 +30,30 @@ do{
 				a => a.endsWith("/"), a => a[0..$-1] ~ u,
 				a => a ~ u), // stripped trailing /
 	      u => u
-	);
+	).removeAnchor;
 
     // write filename on disk
-	dst = toFileName(url, rooturl, false);
+	dst = toFileName(url.removeAnchor, rooturl, false);
     return parseResult(src, dst);
 }
 
+unittest{
+	import std.conv : to;
+    auto p = parseUrl("/about", "http://fragal.eu/");
+    assert(p == parseResult("http://fragal.eu/about", "fragal.eu/about"), p.to!string);
+
+    p = parseUrl("http://example.com", "http://fragal.eu/");
+    assert(p == parseResult("http://example.com", "example.com"), p.to!string);
+
+    p = parseUrl("http://example.com/about", "http://fragal.eu/");
+    assert(p == parseResult("http://example.com/about", "example.com/about"), p.to!string);
+}
+
 string toFileName(const string url, const string absRooturl = "", const bool addIndex = true) @safe
+in{
+    import std.algorithm.searching : canFind;
+    assert(!url.canFind('#'), url);
+}do
 {
 	string rooturl, dst;
 	if(!absRooturl.empty) {
@@ -117,6 +133,9 @@ SumType!(ReceiveAsRange, string) requestUrl(const string url) @trusted
 }
 
 void makeDir(const string path)
+in{
+    assert(path.lastIndexOf('/') > 0, path);
+} do
 {
 	import std.file : mkdirRecurse;
 	import std.string : lastIndexOf;
