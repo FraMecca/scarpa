@@ -4,7 +4,6 @@ import scarpa;
 import magic;
 import config;
 
-import vibe.core.log;
 import requests;
 import ddash.functional;
 import sumtype;

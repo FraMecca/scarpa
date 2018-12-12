@@ -1,35 +1,13 @@
 module scarpa;
 
 import parse;
-
-import sumtype;
-import ddash.functional : cond;
-import vibe.core.log;
-import std.io;
-import requests;
-
-import std.stdio : writeln;
-import std.conv : to;
-import std.typecons : Nullable;
-import std.uuid;
+import database;
+import events;
+import logger;
+import config : config, parseCli ;
 
 // TODO handle update / existing files
 
-alias ID = Nullable!UUID;
-alias Event = SumType!(RequestEvent, HTMLEvent, ToFileEvent);
-alias resolve = match!(
-                       (RequestEvent _ev) => _ev.resolve,
-                       (HTMLEvent _ev) => _ev.resolve,
-                       (ToFileEvent _ev) => _ev.resolve,
-                       );
-
-private void append(E)(ref Event[] res, E e) @safe
-{
-	Event ee = e;
-	res ~= ee;
-}
-
-enum scopeInvariant = "logInfo(this.toString);assert(resolved == false); scope(success) resolved = true;";
 /**
 events:
 1. request to website

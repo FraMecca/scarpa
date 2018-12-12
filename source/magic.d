@@ -1,5 +1,4 @@
 // wrap libmagic
-import vibe.core.log;
 import std.string: toStringz;
 import std.exception : enforce;
 
