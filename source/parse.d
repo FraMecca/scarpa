@@ -90,7 +90,7 @@ unittest{
 string removeAnchor(const string src) @safe
 {
     auto idx = src.lastIndexOf('#');
-    if(idx <= 0) return src;
+    if(idx < 0) return src;
     else return src[0 .. idx];
 }
 
@@ -98,6 +98,19 @@ unittest{
     assert("http://example.com/p#anchor".removeAnchor == "http://example.com/p");
     assert("http://example.com/p#anchor/".removeAnchor == "http://example.com/p");
     assert("http://example.com/#anchor".removeAnchor == "http://example.com/");
+    assert("#anchor".removeAnchor == "");
+    assert("#".removeAnchor == "");
+}
+
+/**
+   Different value checks for valid href url
+*/
+bool isValidHref(const string href)
+{
+    return href.cond!(
+                      h => h.removeAnchor == "", false,
+                      true
+    );
 }
 
 bool isHTMLFile(string[string] headers) @safe
