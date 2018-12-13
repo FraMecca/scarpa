@@ -4,8 +4,10 @@ import parse;
 import database;
 import events;
 import logger;
-import config : config, parseCli ;
+import config : config, parseCli, dumpConfig, CLIResult;
 
+import ddash.functional : cond;
+import sumtype;
 // TODO handle update / existing files
 
 /**
@@ -15,12 +17,19 @@ events:
 3. translation links -> files
 4. save to disk
 */
-void main(string[] args)
+int main(string[] args)
 {
     import std.range;
+	bool exit;
 
-    if(!parseCli(args))
-        return;
+	parseCli(args).cond!(
+		CLIResult.HELP_WANTED, { exit = true; },
+		CLIResult.NEW_PROJECT, { dumpConfig(); }, // TODO createDB
+		CLIResult.RESUME_PROJECT, { log("Resume this project"); }, // TODO import data from db
+		);
+
+	if(exit) return 2;
+
     enableLogging(config.log);
 
     warning(config.projdir);
@@ -29,11 +38,13 @@ void main(string[] args)
 	Event req = RequestEvent("http://fragal.eu");
 	list ~= req;
 
-    auto db = createDB("prova.db");
+    //auto db = createDB(config.projdir ~ "/scarpa.db");
 
     while(!list.empty){
         auto ev = list.front; list.popFront;
         list ~= ev.resolve;
     }
+
+	return 0;
 }
 

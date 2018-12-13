@@ -1,11 +1,22 @@
 module config;
 
+import logger;
+
+import sdlang;
+import std.io;
+
+import std.exception : enforce;
+import std.string;
+import std.range;
+import std.traits;
+
+enum CONFIG_FILE = "config.sdl";
 
 struct Config {
-	ulong maxResSize = 8 * 1024 * 1024; // limits the size of the stream parsed in memory
+	long maxResSize = 8 * 1024 * 1024; // limits the size of the stream parsed in memory
 	bool checkFileAfterSave = true; // after a file is saved, check if it is HTML and parse it again
-	ulong recurLevel = -1;
-	ulong externRecurLevel = -1;
+	long recurLevel = -1;
+	long externRecurLevel = -1;
     string projdir; // considered project name
     string mainDomain;
     string rootUrl;
@@ -16,22 +27,63 @@ struct Config {
 
 __gshared Config _config;
 
+void dumpConfig() @trusted
+{
+	auto root = new Tag();
+
+	static foreach(f; __traits(allMembers, Config)) {
+		mixin("root.add(
+					new Tag(null, \""~f~"\", [Value(_config."~f~")])
+					);");
+	}
+
+	auto fp = File(_config.projdir ~ "/" ~ CONFIG_FILE, mode!"w");
+	fp.write(root.toSDLDocument().representation);
+}
+
+void loadConfig(const string path) @trusted
+{
+	auto fp = File(path, mode!"r");
+	auto dst = appender!string;
+	ubyte[64] buf;
+	ulong s = 0;
+
+	do {
+		s = fp.read(buf);
+		dst.put(cast(string)buf[0..s]);
+	} while(s > 0);
+
+	auto root = parseSource(dst.data);
+
+	static foreach(f; __traits(allMembers, Config)) {
+		mixin("_config."~f~" = root.expectTagValue!(typeof(_config."~f~"))
+				(\""~f~"\");");
+	}
+}
+
 Config config() @trusted
 {
     return _config;
 }
 
-bool parseCli(string[] args)
+enum CLIResult {
+	NEW_PROJECT = 0,
+	RESUME_PROJECT = 1,
+	HELP_WANTED = 2
+}
+
+CLIResult parseCli(string[] args)
 {
     import std.getopt;
     import std.path : isAbsolute, asAbsolutePath;
     import std.array : array;
 
-    import ddash.functional : cond;
-
+	bool resume;
     Config c;
     scope(exit)
         _config = c;
+
+	typeof(return) res;
 
     auto helpInformation = getopt(args,
         "domain|d", "wildcard of the main domain", &c.mainDomain,
@@ -42,28 +94,31 @@ bool parseCli(string[] args)
         "check-after-save", "check if a file can be parsed after save", &c.checkFileAfterSave,
         "log", "location of the log file", &c.log,
         "max-mem-size",  "limit maximum size of files parsed in memory", &c.maxResSize,
+		"resume", "resume a project\nif project directory is not specified, pwd is used", &resume
         );
+
     if (helpInformation.helpWanted){
         defaultGetoptPrinter("Scarpa the scraper. ", helpInformation.options);
-        return false;
-    }
+        return CLIResult.HELP_WANTED;
 
-    // sanity checks
+    } else if (resume) {
+		if(!c.projdir.empty) loadConfig(c.projdir ~ CONFIG_FILE);
+		else loadConfig(CONFIG_FILE);
+		res = CLIResult.RESUME_PROJECT;
 
-    if(!c.projdir.isAbsolute)
-        c.projdir = c.projdir.asAbsolutePath.array;
-    if(c.mainDomain == "")
-        c.mainDomain = c.rootUrl;
+	} else {
+		// sanity checks
+		if(!c.projdir.isAbsolute)
+			c.projdir = c.projdir.asAbsolutePath.array;
+		if(!c.projdir.endsWith("/"))
+			c.projdir ~= "/";
+		if(c.mainDomain == "")
+			c.mainDomain = c.rootUrl;
 
-    bool exitErr(const string err){
-        import std.stdio;
-        stderr.writef(err);
-        return false;
-    }
+		res = CLIResult.NEW_PROJECT;
+	}
+	enforce(!c.projdir.empty, "invalid project directory");
+	enforce(!c.rootUrl.empty, "invalid root URL");
 
-
-    return c.cond!(
-                   cc => cc.projdir.length == 0, { return exitErr("empty project directory."); },
-                   cc => cc.rootUrl.length == 0, { return exitErr("empty initial url."); },
-                   true);
+	return res;
 }

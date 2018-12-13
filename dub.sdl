@@ -11,6 +11,7 @@ dependency "arrogant" version="~>0.2.0"
 dependency "ddash" version="~master"
 dependency "d2sqlite3" version="~>0.18.1"
 dependency "io" version="*"
+dependency "sdlang-d" version="~>0.10.4"
 
 lflags "-lmagic"
 
