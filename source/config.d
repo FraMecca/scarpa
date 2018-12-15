@@ -69,7 +69,8 @@ Config config() @trusted
 enum CLIResult {
 	NEW_PROJECT = 0,
 	RESUME_PROJECT = 1,
-	HELP_WANTED = 2
+	HELP_WANTED = 2,
+	NO_ARGS = 3
 }
 
 CLIResult parseCli(string[] args)
@@ -77,6 +78,8 @@ CLIResult parseCli(string[] args)
     import std.getopt;
     import std.path : isAbsolute, asAbsolutePath;
     import std.array : array;
+
+	if(args.length <= 1) return CLIResult.NO_ARGS;
 
 	bool resume;
     Config c;

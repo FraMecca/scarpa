@@ -16,7 +16,9 @@ import std.typecons : Nullable;
 import std.uuid;
 import std.json;
 
-enum scopeInvariant = "log(this.toString);assert(resolved == false); scope(success) resolved = true;";
+enum scopeInvariant = "log(this.toString);
+						assert(this.resolved == false);
+						scope(success) this.resolved = true;";
 
 alias ID = Nullable!UUID;
 alias Event = SumType!(RequestEvent, HTMLEvent, ToFileEvent);
@@ -24,6 +26,30 @@ alias resolve = match!(
                        (RequestEvent _ev) => _ev.resolve,
                        (HTMLEvent _ev) => _ev.resolve,
                        (ToFileEvent _ev) => _ev.resolve,
+                       );
+
+alias uuid = match!(
+                       (RequestEvent _ev) => _ev.uuid,
+                       (HTMLEvent _ev) => _ev.uuid,
+                       (ToFileEvent _ev) => _ev.uuid,
+                       );
+
+alias resolved = match!(
+                       (RequestEvent _ev) => _ev.resolved,
+                       (HTMLEvent _ev) => _ev.resolved,
+                       (ToFileEvent _ev) => _ev.resolved,
+                       );
+
+alias toJson = match!(
+                       (RequestEvent _ev) => _ev.toJson,
+                       (HTMLEvent _ev) => _ev.toJson,
+                       (ToFileEvent _ev) => _ev.toJson,
+                       );
+
+alias parent = match!(
+                       (RequestEvent _ev) => _ev.parent,
+                       (HTMLEvent _ev) => _ev.parent,
+                       (ToFileEvent _ev) => _ev.parent,
                        );
 
 private void append(E)(ref Event[] res, E e) @safe
@@ -58,6 +84,7 @@ struct RequestEvent {
 	private immutable string m_url;
     Base base;
     alias base this;
+	bool requestOver = false;
 
 	this(const string url, const ID parent = ID()) @safe
 	{
@@ -71,10 +98,11 @@ struct RequestEvent {
 		mixin(scopeInvariant);
 
 		requestUrl(m_url).match!(
-			(ReceiveAsRange stream) => res.append(ToFileEvent(stream, m_url, uuid)),
-			(string raw) => res.append(HTMLEvent(raw, m_url, uuid))
+			(ReceiveAsRange stream) => res.append(ToFileEvent(stream, m_url, this.uuid)),
+			(string raw) => res.append(HTMLEvent(raw, m_url, this.uuid))
 			);
 
+		assert(res.length == 1);
 		return res;
 	}
 
@@ -117,12 +145,12 @@ struct HTMLEvent {
         foreach(ref node; tree.byTagName("a")){
             if(!node["href"].isNull && node["href"].get.isValidHref){
                 auto tup = parseUrl(node["href"].get(), m_rooturl);
-                res.append(RequestEvent(tup.url, parent));
+                res.append(RequestEvent(tup.url, this.parent));
                 node["href"] = tup.fname; // replace with a filename on disk
             }
         }
 		string s = tree.document.innerHTML;
-        res.append(ToFileEvent(s, m_rooturl, parent));
+        res.append(ToFileEvent(s, m_rooturl, this.parent));
 		return res;
 	}
 

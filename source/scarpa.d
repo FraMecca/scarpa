@@ -20,12 +20,14 @@ events:
 int main(string[] args)
 {
     import std.range;
+	import std.stdio : writeln, stderr;
 	bool exit;
 
 	parseCli(args).cond!(
 		CLIResult.HELP_WANTED, { exit = true; },
 		CLIResult.NEW_PROJECT, { dumpConfig(); }, // TODO createDB
-		CLIResult.RESUME_PROJECT, { log("Resume this project"); }, // TODO import data from db
+		CLIResult.RESUME_PROJECT, { writeln("Resume this project"); }, // TODO import data from db
+		CLIResult.NO_ARGS, { stderr.writeln("No arguments specified"); exit = true; },
 		);
 
 	if(exit) return 2;
@@ -37,8 +39,6 @@ int main(string[] args)
 	Event[] list;
 	Event req = RequestEvent("http://fragal.eu");
 	list ~= req;
-
-    //auto db = createDB(config.projdir ~ "/scarpa.db");
 
     while(!list.empty){
         auto ev = list.front; list.popFront;
