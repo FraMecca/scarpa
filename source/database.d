@@ -70,12 +70,14 @@ void insertEvent(RefCounted!(Database, RefCountedAutoInitialize.no) db, Event e)
 	e.match!(
 		 (RequestEvent _ev) {},
 		 (HTMLEvent _ev) {
-			  //auto ddb = db;
-			  //updateParent(ddb, _ev.parent.get);
-			  },
+			 //auto ddb = db;
+			 //updateParent(ddb, _ev.parent.get);
+		 	 assert(false);
+			 },
 		 (ToFileEvent _ev) {
 			 //auto ddb = db;
 			 //updateParent(ddb, _ev.parent.get);
+		 	 assert(false);
 			 }
 	);
 }
