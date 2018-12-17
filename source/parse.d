@@ -157,6 +157,7 @@ in{
 	dir.cond!(
 		d => d.exists && d.isFile, d => handleFileExists(d),
 		d => d.exists && !d.isDir, { throw new Exception("Special file"); },
+        d => d.exists, {},
 		d => d.mkdirRecurse
 	);
 }

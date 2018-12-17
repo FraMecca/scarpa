@@ -37,7 +37,7 @@ void dumpConfig() @trusted
 					);");
 	}
 
-	auto fp = File(_config.projdir ~ "/" ~ CONFIG_FILE, mode!"w");
+	auto fp = File(_config.projdir ~ CONFIG_FILE, mode!"w");
 	fp.write(root.toSDLDocument().representation);
 }
 

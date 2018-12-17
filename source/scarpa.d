@@ -2,6 +2,7 @@ module scarpa;
 
 import parse;
 import database;
+import actors;
 import events;
 import logger;
 import config : config, parseCli, dumpConfig, CLIResult;
@@ -9,6 +10,8 @@ import config : config, parseCli, dumpConfig, CLIResult;
 import ddash.functional : cond;
 import sumtype;
 // TODO handle update / existing files
+
+import std.concurrency;
 
 /**
 events:
@@ -25,7 +28,10 @@ int main(string[] args)
 
 	parseCli(args).cond!(
 		CLIResult.HELP_WANTED, { exit = true; },
-		CLIResult.NEW_PROJECT, { dumpConfig(); }, // TODO createDB
+		CLIResult.NEW_PROJECT, {
+            makeDir(config.projdir);
+            dumpConfig();
+        }, // TODO createDB
 		CLIResult.RESUME_PROJECT, { writeln("Resume this project"); }, // TODO import data from db
 		CLIResult.NO_ARGS, { stderr.writeln("No arguments specified"); exit = true; },
 		);
@@ -36,15 +42,26 @@ int main(string[] args)
 
     warning(config.projdir);
 
-	Event[] list;
-	Event req = RequestEvent("http://fragal.eu");
-	list ~= req;
+	Event req = RequestEvent(config.rootUrl);
 
-    while(!list.empty){
-        auto ev = list.front; list.popFront;
-        list ~= ev.resolve;
+    auto actor = spawn(&mainActor);
+    actor.send(cast(shared) req);
+
+    while(true){
+        actor.send(thisTid);
+        log("main send");
+        receive(
+            (shared Event sevent) {
+                auto event = cast(Event) sevent;
+                log(event);
+                foreach(ev; event.resolve){
+                    actor.send(cast(shared) ev);
+                }
+            },
+            (Variant v) { assert(false); },
+        );
     }
 
-	return 0;
+	// return 0;
 }
 

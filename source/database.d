@@ -38,7 +38,7 @@ auto createDB(const string location)
   * HTML/FILE events are always the result of a single request event.
   * Request events need to be marked as `over` when its only child is resolved.
 */
-void insertEvent(RefCounted!(Database, RefCountedAutoInitialize.no) db, Event e)
+void insertEvent(Database db, Event e)
 {
 	assert(e.resolved == true); // To be called only when an event is solved
 
@@ -66,36 +66,47 @@ void insertEvent(RefCounted!(Database, RefCountedAutoInitialize.no) db, Event e)
 
 	statement.execute();
 	statement.reset(); // Need to reset the statement after execution.
+    void updateParent(Database db, ID parent)
+    {
+        if (e.parent.isNull) return;
+        Statement statement = db.prepare(
+                                         "UPDATE Event
+				SET resolved = 1,
+				WHERE uuid = :uuid"
+                                         );
 
-	e.match!(
-		 (RequestEvent _ev) {},
-		 (HTMLEvent _ev) {
-			 //auto ddb = db;
-			 //updateParent(ddb, _ev.parent.get);
-		 	 assert(false);
-			 },
-		 (ToFileEvent _ev) {
-			 //auto ddb = db;
-			 //updateParent(ddb, _ev.parent.get);
-		 	 assert(false);
-			 }
-	);
+        statement.bind(":uuid", parent.toString);
+
+        statement.execute();
+        statement.reset(); // Need to reset the statement after execution.
+    }
+
+    updateParent(db, e.parent);
+	// e.tryMatch!(
+	// 	 (RequestEvent _ev) {},
+	// 	 (ToFileEvent _ev) {
+	// 		 updateParent(db, _ev.parent.get);
+    //      },
+	// 	 (HTMLEvent _ev) {
+    //          {
+    //              // updateParent(refCounted(db), _ev.parent.get);
+    //              // auto ddb = move(db);
+    //             //  Statement statement = db.prepare(
+    //             //                                   "UPDATE Event
+	// 			// SET resolved = 1,
+	// 			// WHERE uuid = :uuid"
+    //             //                                   );
+
+    //             //  statement.bind(":uuid", _ev.parent.get.toString);
+
+    //             //  statement.execute();
+    //             //  statement.reset(); // Need to reset the statement after execution.
+    //          }
+	// 	     },
+	// );
 }
 
 /// find parent and update its `resolved` status to `true`
-void updateParent(Database db, UUID parent)
-{
-	Statement statement = db.prepare(
-			"UPDATE Event
-				SET resolved = 1,
-				WHERE uuid = :uuid"
-			);
-
-	statement.bind(":uuid", parent.toString);
-
-	statement.execute();
-	statement.reset(); // Need to reset the statement after execution.
-}
 
 bool testEvent(Database db, UUID uuid)
 {

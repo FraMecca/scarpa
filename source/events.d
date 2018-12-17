@@ -59,8 +59,8 @@ private void append(E)(ref Event[] res, E e) @safe
 }
 
 struct Base {
-	immutable ID m_parent;
-	immutable ID m_uuid;
+	ID m_parent;
+	ID m_uuid;
 	bool resolved = false;
 
 	this(const ID parent, const UUID uuid) @safe
@@ -81,7 +81,7 @@ struct Base {
 
 struct RequestEvent {
 
-	private immutable string m_url;
+	private string m_url;
     Base base;
     alias base this;
 	bool requestOver = false;
@@ -119,8 +119,8 @@ struct RequestEvent {
 
 struct HTMLEvent {
 
-	private immutable string m_content;
-	private immutable string m_rooturl;
+	private string m_content;
+	private string m_rooturl;
     Base base;
     alias base this;
 
@@ -168,8 +168,8 @@ struct HTMLEvent {
 struct ToFileEvent
 {
 	private SumType!(ReceiveAsRange, string) m_content;
-    private immutable string m_rooturl;
-    private immutable string m_fname;
+    private string m_rooturl;
+    private string m_fname;
     Base base;
     alias base this;
 
