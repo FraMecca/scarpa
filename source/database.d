@@ -1,6 +1,7 @@
 module database;
 
 import events;
+import logger;
 
 import d2sqlite3;
 import sumtype;
@@ -23,7 +24,6 @@ auto createDB(const string location)
     // TODO text length for uuid
     auto table =
         r"create table Event (
-           id integer primary key autoincrement,
            type integer,
 		   resolved integer not null,
            uuid text not null unique,
@@ -40,15 +40,13 @@ auto createDB(const string location)
 */
 void insertEvent(Database db, Event e)
 {
-	assert(e.resolved == true); // To be called only when an event is solved
-
 	auto data = e.toJson.toString();
 	auto parent = e.parent.isNull ? "" : e.parent.get.toString;
 	auto uuid = e.uuid.get.toString;
 
 	Statement statement = db.prepare(
 				"INSERT INTO Event (type, resolved, uuid, parent, data)
-				VALUES (:type, :uuid, :parent, :data)"
+				VALUES (:type, :resolved, :uuid, :parent, :data)"
 			);
 	statement.bind(":type", e.match!(
 				 (RequestEvent _ev) => Type.RequestEvent,
@@ -66,12 +64,14 @@ void insertEvent(Database db, Event e)
 
 	statement.execute();
 	statement.reset(); // Need to reset the statement after execution.
+
+
     void updateParent(Database db, ID parent)
     {
         if (e.parent.isNull) return;
         Statement statement = db.prepare(
                                          "UPDATE Event
-				SET resolved = 1,
+				SET resolved = 1
 				WHERE uuid = :uuid"
                                          );
 
@@ -106,8 +106,9 @@ void insertEvent(Database db, Event e)
 	// );
 }
 
-/// find parent and update its `resolved` status to `true`
-
+/**
+ * check if request event was over
+ */
 bool testEvent(Database db, UUID uuid)
 {
 	Statement statement = db.prepare(

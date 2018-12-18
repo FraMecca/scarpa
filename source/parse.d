@@ -109,7 +109,11 @@ bool isValidHref(const string href)
 {
     return href.cond!(
                       h => h.removeAnchor == "", false,
-                      true
+                      h => h.startsWith("/"), true,
+                      h => h.startsWith("http://"), true,
+                      h => h.startsWith("https://"), true,
+                      false
+
     );
 }
 

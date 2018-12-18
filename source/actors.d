@@ -19,28 +19,30 @@ void mainActor()
 
 	auto queue = DList!Event();
 
-	while(true) {
-        log("db nel while");
-		receive(
-			(shared Event ee) {
-                auto e = cast(Event) ee;
-                // TODO investigate how to avoid shared
-                log("db ev");
-				if(!db.testEvent(e.uuid) && !e.resolved) queue.insertBack(e);
-				else insertEvent(db, e);
-				},
-			(Tid tid) {
-                log(cast(int)queue.empty);
-                if(!queue.empty) {
-                    log(tid);
-                  auto ev = cast(shared) queue.front;
-                  queue.removeFront();
-                  tid.send(ev);
+    try{
+        while(true) {
+            receive(
+                (shared Event ee) {
+                    auto e = cast(Event) ee;
+                    // TODO investigate how to avoid shared
+                    if(!db.testEvent(e.uuid)){
+                        if(!e.resolved) queue.insertBack(e);
+                        insertEvent(db, e);
+                    }
+                },
+                (Tid tid) {
+                    if(!queue.empty) {
+                      auto ev = cast(shared) queue.front;
+                      queue.removeFront();
+                      tid.send(ev);
+                    }
+                },
+                (Variant v) {
+                    assert(false);
                 }
-			},
-            (Variant v) {
-                assert(false);
-            }
-		);
-	}
+            );
+        }
+    } catch(Exception e){
+        fatal(e.msg);
+    }
 }

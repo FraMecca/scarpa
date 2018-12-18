@@ -47,21 +47,34 @@ int main(string[] args)
     auto actor = spawn(&mainActor);
     actor.send(cast(shared) req);
 
-    while(true){
-        actor.send(thisTid);
-        log("main send");
-        receive(
-            (shared Event sevent) {
-                auto event = cast(Event) sevent;
-                log(event);
-                foreach(ev; event.resolve){
-                    actor.send(cast(shared) ev);
-                }
-            },
-            (Variant v) { assert(false); },
-        );
-    }
+    spawn(&routine, actor);
+    spawn(&routine, actor);
+    // routine(actor);
+    import core.thread;
+    thread_joinAll();
 
-	// return 0;
+	return 0;
 }
 
+void routine(Tid actor)
+{
+    try{
+        while(true){
+            actor.send(thisTid);
+            log(thisTid);
+            receive(
+                (shared Event sevent) {
+                    auto event = cast(Event) sevent;
+                    auto nextEvents = event.resolve;
+                    actor.send(cast(shared)event);
+                    foreach(ev; nextEvents){
+                        actor.send(cast(shared) ev);
+                    }
+                },
+                (Variant v) { fatal(v); },
+            );
+        }
+    } catch(Exception e){
+        fatal(e.msg);
+    }
+}
