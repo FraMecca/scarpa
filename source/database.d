@@ -14,7 +14,7 @@ import std.uuid;
 enum Type {
            RequestEvent = 0,
            HTMLEvent = 1,
-           ToFileEvent = 2
+           ToFileEvent = 2,
 };
 
 auto createDB(const string location)
@@ -51,12 +51,12 @@ void insertEvent(Database db, Event e)
 	statement.bind(":type", e.match!(
 				 (RequestEvent _ev) => Type.RequestEvent,
 				 (HTMLEvent _ev) => Type.HTMLEvent,
-				 (ToFileEvent _ev) => Type.ToFileEvent
+				 (inout ToFileEvent _ev) => Type.ToFileEvent,
 			));
 	statement.bind(":resolved", e.match!(
 				 (RequestEvent _ev) => _ev.requestOver,
 				 (HTMLEvent _ev) => true,
-				 (ToFileEvent _ev) => true,
+				 (const ToFileEvent _ev) => true,
 			));
 	statement.bind(":uuid", uuid);
 	statement.bind(":parent", parent);
@@ -82,28 +82,6 @@ void insertEvent(Database db, Event e)
     }
 
     updateParent(db, e.parent);
-	// e.tryMatch!(
-	// 	 (RequestEvent _ev) {},
-	// 	 (ToFileEvent _ev) {
-	// 		 updateParent(db, _ev.parent.get);
-    //      },
-	// 	 (HTMLEvent _ev) {
-    //          {
-    //              // updateParent(refCounted(db), _ev.parent.get);
-    //              // auto ddb = move(db);
-    //             //  Statement statement = db.prepare(
-    //             //                                   "UPDATE Event
-	// 			// SET resolved = 1,
-	// 			// WHERE uuid = :uuid"
-    //             //                                   );
-
-    //             //  statement.bind(":uuid", _ev.parent.get.toString);
-
-    //             //  statement.execute();
-    //             //  statement.reset(); // Need to reset the statement after execution.
-    //          }
-	// 	     },
-	// );
 }
 
 /**

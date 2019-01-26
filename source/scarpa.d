@@ -2,7 +2,6 @@ module scarpa;
 
 import parse;
 import database;
-import actors;
 import events;
 import logger;
 import config : config, parseCli, dumpConfig, CLIResult;
@@ -10,8 +9,6 @@ import config : config, parseCli, dumpConfig, CLIResult;
 import ddash.functional : cond;
 import sumtype;
 // TODO handle update / existing files
-
-import std.concurrency;
 
 /**
 events:
@@ -42,39 +39,14 @@ int main(string[] args)
 
     warning(config.projdir);
 
-	Event req = RequestEvent(config.rootUrl);
-
-    auto actor = spawn(&mainActor);
-    actor.send(cast(shared) req);
-
-    spawn(&routine, actor);
-    spawn(&routine, actor);
-    // routine(actor);
-    import core.thread;
-    thread_joinAll();
+    Event[] list;
+    auto first = firstEvent(config.rootUrl);
+    list ~= first.resolve;
+    pragma(msg, Event.sizeof);
+    while(!list.empty){
+        auto eee = list.front;
+        list.popFront;
+    }
 
 	return 0;
-}
-
-void routine(Tid actor)
-{
-    try{
-        while(true){
-            actor.send(thisTid);
-            log(thisTid);
-            receive(
-                (shared Event sevent) {
-                    auto event = cast(Event) sevent;
-                    auto nextEvents = event.resolve;
-                    actor.send(cast(shared)event);
-                    foreach(ev; nextEvents){
-                        actor.send(cast(shared) ev);
-                    }
-                },
-                (Variant v) { fatal(v); },
-            );
-        }
-    } catch(Exception e){
-        fatal(e.msg);
-    }
 }

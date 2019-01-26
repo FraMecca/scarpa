@@ -20,6 +20,8 @@ configuration "application" {
 	mainSourceFile "source/scarpa.d"
 }
 
+subConfiguration "requests" "vibed"
+
 configuration "unittest" {
 	targetType "executable"
 	mainSourceFile "source/scarpa.d"

@@ -16,67 +16,108 @@ import std.typecons : Nullable;
 import std.uuid;
 import std.json;
 
-enum scopeInvariant = "log(this.toString);
-						assert(this.resolved == false);
-						scope(success) this.resolved = true;";
+struct _Event{
+    SumType!(RequestEvent, HTMLEvent, ToFileEvent) ev;
+    alias ev this;
+    this(RequestEvent e) @safe { ev = e; }
+    this(HTMLEvent e) @safe { ev = e; }
+    this(ToFileEvent e) @safe { ev = e; }
+
+    inout string toString() @safe
+    {
+        return ev.match!(
+            (RequestEvent _ev) => "RequestEvent(basedir: " ~ config.projdir ~ ", url: " ~ _ev.m_url ~ ")",
+            (HTMLEvent _ev) => "HTMLEvent(basedir: " ~ config.projdir ~ ", rooturl: " ~ _ev.m_rooturl ~ ")",
+            (const ToFileEvent _ev) => "ToFileEvent(basedir: " ~ config.projdir ~ ", file: " ~ _ev.m_fname ~ " url:" ~ _ev.m_rooturl ~ ")");
+    }
+
+    const JSONValue toJson() @safe
+    {
+        return ev.match!(
+            (RequestEvent _ev) { 
+                auto j = JSONValue();
+                j["url"] = _ev.m_url;
+                return j;},
+            (HTMLEvent _ev) { 
+                auto j = JSONValue();
+                j["url"] = _ev.m_rooturl;
+                return j;
+            },
+            (inout ToFileEvent _ev) {
+                auto j = JSONValue();
+                j["fname"] = _ev.m_fname;
+                j["url"] = _ev.m_rooturl;
+                return j;
+            });
+    }
+
+    const parent() @safe
+    {
+        return ev.match!(
+            (const RequestEvent _ev) => _ev.parent,
+            (const HTMLEvent _ev) => _ev.parent,
+            (const ToFileEvent _ev) => _ev.parent);
+    }
+
+    const uuid() @safe
+    {
+        return ev.match!(
+            (const RequestEvent _ev) => _ev.uuid,
+            (const HTMLEvent _ev) => _ev.uuid,
+            (const ToFileEvent _ev) => _ev.uuid);
+    }
+
+    const resolve() @safe
+    {
+        log(this.toString);
+        return ev.match!(
+            (RequestEvent _ev) => _ev.resolve(),
+            (HTMLEvent _ev) => _ev.resolve(),
+            (const ToFileEvent _ev) => _ev.resolve());
+    }
+}
+
+alias Event = immutable(_Event);
+
+template makeEvent(alias t)
+{
+    auto makeEvent() {
+        immutable e = _Event(t);
+        return e;
+    }
+}
+
+auto firstEvent(string rootUrl)
+{
+    auto r = RequestEvent(rootUrl);
+	Event req = makeEvent!(r);
+    return req;
+}
 
 alias ID = Nullable!UUID;
-alias Event = SumType!(RequestEvent, HTMLEvent, ToFileEvent);
-alias resolve = match!(
-                       (RequestEvent _ev) => _ev.resolve,
-                       (HTMLEvent _ev) => _ev.resolve,
-                       (ToFileEvent _ev) => _ev.resolve,
-                       );
-
-alias uuid = match!(
-                       (RequestEvent _ev) => _ev.uuid,
-                       (HTMLEvent _ev) => _ev.uuid,
-                       (ToFileEvent _ev) => _ev.uuid,
-                       );
-
-alias resolved = match!(
-                       (RequestEvent _ev) => _ev.resolved,
-                       (HTMLEvent _ev) => _ev.resolved,
-                       (ToFileEvent _ev) => _ev.resolved,
-                       );
-
-alias toJson = match!(
-                       (RequestEvent _ev) => _ev.toJson,
-                       (HTMLEvent _ev) => _ev.toJson,
-                       (ToFileEvent _ev) => _ev.toJson,
-                       );
-
-alias parent = match!(
-                       (RequestEvent _ev) => _ev.parent,
-                       (HTMLEvent _ev) => _ev.parent,
-                       (ToFileEvent _ev) => _ev.parent,
-                       );
 
 private void append(E)(ref Event[] res, E e) @safe
 {
-	Event ee = e;
+    auto ee = makeEvent!(e);
 	res ~= ee;
 }
 
 struct Base {
-	ID m_parent;
-	ID m_uuid;
+	ID parent;
+	ID uuid;
 	bool resolved = false;
 
 	this(const ID parent, const UUID uuid) @safe
 	{
-        m_parent = parent;
-        m_uuid = uuid;
+        this.parent = parent;
+        this.uuid = uuid;
 	}
 
 	this(const UUID parent, const UUID uuid) @safe
 	{
-        m_parent = parent;
-        m_uuid = uuid;
+        this.parent = parent;
+        this.uuid = uuid;
 	}
-
-    @property const ID uuid() @safe { return m_uuid; }
-    @property const ID parent() @safe { return m_parent; }
 }
 
 struct RequestEvent {
@@ -92,10 +133,9 @@ struct RequestEvent {
 		m_url = url;
 	}
 
-	Event[] resolve() @safe
+	const Event[] resolve() @safe
 	{
 		Event[] res;
-		mixin(scopeInvariant);
 
 		requestUrl(m_url).match!(
 			(ReceiveAsRange stream) => res.append(ToFileEvent(stream, m_url, this.uuid)),
@@ -105,17 +145,7 @@ struct RequestEvent {
 		assert(res.length == 1);
 		return res;
 	}
-
-    string toString() @safe { return "RequestEvent(basedir: " ~ config.projdir ~ ", url: " ~ m_url ~ ")"; }
-
-    @property JSONValue toJson() @safe
-    {
-        auto j = JSONValue();
-        j["url"] = m_url;
-        return j;
-    }
 }
-
 
 struct HTMLEvent {
 
@@ -131,10 +161,9 @@ struct HTMLEvent {
         m_rooturl = root; // the url of the page requested
 	}
 
-	Event[] resolve() @trusted// TODO safe 
+	const Event[] resolve() @trusted// TODO safe 
 	{
         import arrogant;
-		mixin(scopeInvariant);
 
 		Event[] res;
 
@@ -153,17 +182,7 @@ struct HTMLEvent {
         res.append(ToFileEvent(s, m_rooturl, this.parent));
 		return res;
 	}
-
-    string toString() @safe { return "HTMLEvent(basedir: " ~ config.projdir ~ ", rooturl: " ~ m_rooturl ~ ")"; }
-
-    @property JSONValue toJson() @safe
-    {
-        auto j = JSONValue();
-        j["url"] = m_rooturl;
-        return j;
-    }
 }
-
 
 struct ToFileEvent
 {
@@ -173,8 +192,7 @@ struct ToFileEvent
     Base base;
     alias base this;
 
-	this(T)(T content, const string url, const ID parent) @safe
-		if(is(T == string) || is(T == ReceiveAsRange))
+	this(ReceiveAsRange content, const string url, const ID parent) @safe
 	{
 		m_content = content;
         m_rooturl = url;
@@ -182,12 +200,20 @@ struct ToFileEvent
         base = Base(parent, md5UUID(m_fname));
 	}
 
-	Event[] resolve() @trusted
+	this(string content, const string url, const ID parent) @safe
+    {
+            m_content = content;
+            m_rooturl = url;
+            m_fname = config.projdir ~ url.toFileName;
+            base = Base(parent, md5UUID(m_fname));
+        }
+
+	const Event[] resolve() @trusted
 	{
+        import vibe.core.file : openFile, FileMode;
         import std.algorithm.iteration : each;
         import std.file : exists, isDir, isFile;
         import std.string : representation;
- 		mixin(scopeInvariant);
 		Event[] res;
 
         string fname = m_fname.dup;
@@ -203,27 +229,17 @@ struct ToFileEvent
 				);
 		}
 
+        auto fp = openFile(fname, FileMode.readWrite);
 		m_content.match!(
-				(string s) {
-					auto fp = File(fname, mode!"w");
+				(const string s) {
 					fp.write(s.representation);
 					},
-				(ReceiveAsRange r) {
-					auto fp = File(fname, mode!"wb");
+				(const ReceiveAsRange cr) {
+                    auto r = cast(ReceiveAsRange)cr; // cannot use bcs const
 					r.each!((e) => fp.write(e));
 					// TODO check file type in case of binary
 					}
 				);
         return res;
 	}
-
-    string toString() @safe { return "ToFileEvent(basedir: " ~ config.projdir ~ ", file: " ~ m_fname ~ " url:" ~ m_rooturl ~ ")"; }
-
-    @property JSONValue toJson() @safe
-    {
-        auto j = JSONValue();
-        j["url"] = m_rooturl;
-        j["fname"] = m_fname;
-        return j;
-    }
 }

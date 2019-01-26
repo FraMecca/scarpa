@@ -9,7 +9,8 @@ import ddash.functional;
 import sumtype;
 
 // import std.file;
-import std.file : mkdirRecurse, exists, isFile, isDir, rename;
+import std.file : mkdirRecurse, /*exists,*/ isFile, isDir/*, rename*/; // TODO : vibe
+import vibe.core.file : exists = existsFile, rename = moveFile;
 import std.exception: enforce;
 import std.string;
 import std.typecons : Tuple, tuple;
@@ -137,6 +138,7 @@ SumType!(ReceiveAsRange, string) requestUrl(const string url) @trusted
 
 	auto rq = Request();
 	rq.useStreaming = true;
+    rq.sslSetCaCert("/etc/ssl/cert.pem"); // TODO manage
 	auto rs = rq.get(url);
 	auto resBody = appender!(string);
 
