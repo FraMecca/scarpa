@@ -42,13 +42,13 @@ do{
 unittest{
 	import std.conv : to;
     auto p = parseUrl("/about", "http://fragal.eu/");
-    assert(p == parseResult("http://fragal.eu/about", "fragal.eu/about"), p.to!string);
+    assert(p == parseResult("http://fragal.eu/about", "../fragal.eu/about"), p.to!string);
 
     p = parseUrl("http://example.com", "http://fragal.eu/");
-    assert(p == parseResult("http://example.com", "example.com"), p.to!string);
+    assert(p == parseResult("http://example.com", "../example.com"), p.to!string);
 
     p = parseUrl("http://example.com/about", "http://fragal.eu/");
-    assert(p == parseResult("http://example.com/about", "example.com/about"), p.to!string);
+    assert(p == parseResult("http://example.com/about", "../example.com/about"), p.to!string);
 }
 
 string toFileName(const string url, const string absRooturl = "", const bool addIndex = true) @safe
@@ -79,6 +79,8 @@ in{
 		  u => u.startsWith("/"), u => rooturl ~ u.stripLeft("/"),
 		  u => u
 	);
+
+	// TODO add ../ for correct parsing by browsers
 
 	return dst;
 }

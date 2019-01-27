@@ -16,6 +16,34 @@ import std.typecons : Nullable;
 import std.uuid;
 import std.json;
 
+enum Type {
+           RequestEvent = 0,
+           HTMLEvent = 1,
+           ToFileEvent = 2,
+};
+
+bool less(Event a, Event b)
+{
+	assert(false);
+	////Type ta = a.match!(
+				 ////(RequestEvent _ev) => Type.RequestEvent,
+				 ////(HTMLEvent _ev) => Type.HTMLEvent,
+				 ////(inout ToFileEvent _ev) => Type.ToFileEvent,
+			////);
+
+	////Type tb = b.match!(
+				 ////(RequestEvent _ev) => Type.RequestEvent,
+				 ////(HTMLEvent _ev) => Type.HTMLEvent,
+				 ////(inout ToFileEvent _ev) => Type.ToFileEvent,
+			////);
+
+	//return ta.cond!(
+		//ta == tb, false,
+		//ta < tb, true,
+		//ta > tb, false
+		//);
+}
+
 struct _Event{
     SumType!(RequestEvent, HTMLEvent, ToFileEvent) ev;
     alias ev this;
@@ -23,13 +51,10 @@ struct _Event{
     this(HTMLEvent e) @safe { ev = e; }
     this(ToFileEvent e) @safe { ev = e; }
 
-    inout string toString() @safe
-    {
-        return ev.match!(
-            (RequestEvent _ev) => "RequestEvent(basedir: " ~ config.projdir ~ ", url: " ~ _ev.m_url ~ ")",
-            (HTMLEvent _ev) => "HTMLEvent(basedir: " ~ config.projdir ~ ", rooturl: " ~ _ev.m_rooturl ~ ")",
-            (const ToFileEvent _ev) => "ToFileEvent(basedir: " ~ config.projdir ~ ", file: " ~ _ev.m_fname ~ " url:" ~ _ev.m_rooturl ~ ")");
-    }
+	@property inout string toString() @safe
+	{
+		return ev.toString;
+	}
 
     const JSONValue toJson() @safe
     {
@@ -69,7 +94,8 @@ struct _Event{
 
     const resolve() @safe
     {
-        log(this.toString);
+		log(this.toString);
+
         return ev.match!(
             (RequestEvent _ev) => _ev.resolve(),
             (HTMLEvent _ev) => _ev.resolve(),
@@ -105,7 +131,6 @@ private void append(E)(ref Event[] res, E e) @safe
 struct Base {
 	ID parent;
 	ID uuid;
-	bool resolved = false;
 
 	this(const ID parent, const UUID uuid) @safe
 	{
@@ -145,6 +170,11 @@ struct RequestEvent {
 		assert(res.length == 1);
 		return res;
 	}
+
+	@property const string toString() @safe
+	{
+		return "RequestEvent(basedir: " ~ config.projdir ~ ", url: " ~ m_url ~ ")";
+	}
 }
 
 struct HTMLEvent {
@@ -182,6 +212,11 @@ struct HTMLEvent {
         res.append(ToFileEvent(s, m_rooturl, this.parent));
 		return res;
 	}
+
+	@property const string toString() @safe
+	{
+		return "HTMLEvent(basedir: " ~ config.projdir ~ ", rooturl: " ~ m_rooturl ~")";
+	}
 }
 
 struct ToFileEvent
@@ -218,8 +253,6 @@ struct ToFileEvent
 
         string fname = m_fname.dup;
 
-		warning(fname);
-
 		fname.makeDir();
 
 		if(fname.exists && !fname.isFile) {
@@ -229,7 +262,7 @@ struct ToFileEvent
 				);
 		}
 
-        auto fp = openFile(fname, FileMode.readWrite);
+        auto fp = openFile(fname, FileMode.append);
 		m_content.match!(
 				(const string s) {
 					fp.write(s.representation);
@@ -241,5 +274,10 @@ struct ToFileEvent
 					}
 				);
         return res;
+	}
+
+	@property const string toString() @safe
+	{
+		return "ToFileEvent(basedir: " ~ config.projdir ~ ", file: " ~ m_fname ~ " url:" ~ m_rooturl ~ ")";
 	}
 }

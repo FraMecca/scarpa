@@ -11,13 +11,7 @@ import std.json;
 import std.typecons;
 import std.uuid;
 
-enum Type {
-           RequestEvent = 0,
-           HTMLEvent = 1,
-           ToFileEvent = 2,
-};
-
-auto createDB(const string location)
+auto createDB(const string location) @trusted
 {
     auto db = Database(location);
 
@@ -38,7 +32,7 @@ auto createDB(const string location)
   * HTML/FILE events are always the result of a single request event.
   * Request events need to be marked as `over` when its only child is resolved.
 */
-void insertEvent(Database db, Event e)
+void insertEvent(ref Database db, Event e) @trusted
 {
 	auto data = e.toJson.toString();
 	auto parent = e.parent.isNull ? "" : e.parent.get.toString;
@@ -87,8 +81,10 @@ void insertEvent(Database db, Event e)
 /**
  * check if request event was over
  */
-bool testEvent(Database db, UUID uuid)
+bool testEvent(ref Database db, Event ev) @trusted
 {
+	auto uuid = ev.uuid.get;
+
 	Statement statement = db.prepare(
 			"SELECT EXISTS(SELECT 1
 				FROM Event
@@ -101,4 +97,40 @@ bool testEvent(Database db, UUID uuid)
 	statement.reset(); // Need to reset the statement after execution.
 
 	return res;
+}
+
+bool isResolved(ref Database db, Event ev) @trusted
+{
+	auto uuid = ev.uuid.get;
+
+	Statement statement = db.prepare(
+			"SELECT EXISTS(SELECT 1
+				FROM Event
+				WHERE uuid = :uuid
+				AND resolved = 1)"
+			);
+
+	statement.bind(":uuid", uuid.toString);
+
+	auto res = statement.execute().oneValue!bool;
+	statement.reset(); // Need to reset the statement after execution.
+
+	return res;
+}
+
+void setResolved(ref Database db, Event ev) @trusted
+{
+	auto uuid = ev.uuid.get;
+
+	Statement statement = db.prepare(
+			"UPDATE Event
+				SET resolved = 1
+				WHERE uuid = :uuid
+				AND resolved = 1"
+			);
+
+	statement.bind(":uuid", uuid.toString);
+
+	statement.execute();
+	statement.reset(); // Need to reset the statement after execution.
 }
