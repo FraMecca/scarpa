@@ -101,19 +101,21 @@ int main(string[] args)
     auto first = firstEvent(config.rootUrl);
 	auto storage = Storage(config.projdir ~ "/scarpa.db", first);
 
-    while(!storage.empty){
-		auto ev = storage.getEvent();
-		storage.fire(ev, thisTid);
+    while(true){
+        while(!storage.empty){
+            auto ev = storage.getEvent();
+            storage.fire(ev, thisTid);
+        }
 
-		// receive result (from first available)
-		auto uuid = receiveOnly!string();
-		auto newEvents = storage.tasks[uuid].getResult();
+        // receive result (from first available)
+        auto uuid = receiveOnly!string();
+        auto newEvents = storage.tasks[uuid].getResult();
 
-		// enqueue
-		foreach (e; newEvents) {
-			storage.put(e);
+        // enqueue
+        foreach (e; newEvents) {
+            storage.put(e);
 		}
     }
 
-	return 0;
+	// return 0;
 }
