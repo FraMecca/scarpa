@@ -12,6 +12,9 @@ import ddash.functional : cond;
 import sumtype;
 
 import std.range;
+import std.typecons;
+
+alias ValidEvent = SumType!(Event, Flag!"event");
 
 // TODO handle update / existing files
 struct Storage {
@@ -23,11 +26,13 @@ struct Storage {
 	//HashMap!(string, Future!(Event[])) tasks;
 	Future!(Event[])[string] tasks;
 	Event[] queue;
+	Tid mainTid;
 
-	this(const string location, Event first) @trusted
+	this(const string location, Event first, Tid tid) @trusted
 	{
 		db = createDB(location);
 		queue ~= first;
+		mainTid = tid;
 	}
 
 	@property bool empty() @safe
@@ -35,15 +40,20 @@ struct Storage {
 		return queue.empty;
 	}
 
-	Event getEvent() @safe
+	ValidEvent getEvent() @trusted
 	{
 		auto ev = queue.front;
 		queue.popFront();
 
-		if(db.testEvent(ev)) return getEvent();
-		else {
+		if(db.testEvent(ev) && !queue.empty) {
+			return getEvent();
+
+		} else if(!db.testEvent(ev)) {
 			db.insertEvent(ev);
-			return ev;
+			return ValidEvent(ev);
+
+		} else {
+			return ValidEvent(No.event);
 		}
 	}
 
@@ -52,14 +62,14 @@ struct Storage {
 		queue ~= ev;
 	}
 
-	void fire(Event ev, Tid tid) @trusted
+	void fire(Event ev) @trusted
 	{
 		auto uuid = ev.uuid.get.toString;
 
 		auto go() {
 			auto results = ev.resolve;
 			db.setResolved(ev);
-			tid.send(uuid);
+			mainTid.send(uuid);
 			return results;
 		}
 
@@ -87,7 +97,7 @@ int main(string[] args)
 		CLIResult.NEW_PROJECT, {
             makeDir(config.projdir);
             dumpConfig();
-        }, // TODO createDB
+        },
 		CLIResult.RESUME_PROJECT, { writeln("Resume this project"); }, // TODO import data from db
 		CLIResult.NO_ARGS, { stderr.writeln("No arguments specified"); exit = true; },
 		);
@@ -99,12 +109,18 @@ int main(string[] args)
     warning(config.projdir);
 
     auto first = firstEvent(config.rootUrl);
-	auto storage = Storage(config.projdir ~ "/scarpa.db", first);
+	auto storage = Storage(config.projdir ~ "/scarpa.db", first, thisTid);
 
+	const uint NEVENTS = 2; // TODO remove, debug purpose
     while(true){
-        while(!storage.empty){
+		uint ne;
+        while(!storage.empty && ne < NEVENTS){
             auto ev = storage.getEvent();
-            storage.fire(ev, thisTid);
+			ev.match!(
+				(Event e) => storage.fire(e),
+				(Flag!"event" f) => warning("No events in list")
+				);
+			ne++;
         }
 
         // receive result (from first available)
