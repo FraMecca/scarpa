@@ -15,41 +15,24 @@ import std.conv : to;
 import std.typecons : Nullable;
 import std.uuid;
 import std.json;
+import std.meta;
 
-enum Type {
-           RequestEvent = 0,
+enum EventType { // order of execution for BinnedPQ
+           ToFileEvent = 0,
            HTMLEvent = 1,
-           ToFileEvent = 2,
+           RequestEvent = 2,
 };
 
-bool less(Event a, Event b)
-{
-	assert(false);
-	////Type ta = a.match!(
-				 ////(RequestEvent _ev) => Type.RequestEvent,
-				 ////(HTMLEvent _ev) => Type.HTMLEvent,
-				 ////(inout ToFileEvent _ev) => Type.ToFileEvent,
-			////);
-
-	////Type tb = b.match!(
-				 ////(RequestEvent _ev) => Type.RequestEvent,
-				 ////(HTMLEvent _ev) => Type.HTMLEvent,
-				 ////(inout ToFileEvent _ev) => Type.ToFileEvent,
-			////);
-
-	//return ta.cond!(
-		//ta == tb, false,
-		//ta < tb, true,
-		//ta > tb, false
-		//);
-}
+alias EventRange = Event[];
+alias EventResult = EventRange;
+alias EventSeq = AliasSeq!(RequestEvent, HTMLEvent, ToFileEvent);
 
 struct _Event{
-    SumType!(RequestEvent, HTMLEvent, ToFileEvent) ev;
+    SumType!EventSeq ev;
     alias ev this;
-    this(RequestEvent e) @safe { ev = e; }
-    this(HTMLEvent e) @safe { ev = e; }
-    this(ToFileEvent e) @safe { ev = e; }
+    this(inout RequestEvent e) @safe { ev = e; }
+    this(inout HTMLEvent e) @safe { ev = e; }
+    this(inout ToFileEvent e) @safe { ev = e; }
 
 	@property inout string toString() @safe
 	{
@@ -101,6 +84,11 @@ struct _Event{
             (HTMLEvent _ev) => _ev.resolve(),
             (const ToFileEvent _ev) => _ev.resolve());
     }
+
+	auto hashOf() @safe
+	{
+		return this.uuid.get.toString;
+	}
 }
 
 alias Event = immutable(_Event);
@@ -122,7 +110,7 @@ auto firstEvent(string rootUrl)
 
 alias ID = Nullable!UUID;
 
-private void append(E)(ref Event[] res, E e) @safe
+private void append(E)(ref EventRange res, E e) @safe
 {
     auto ee = makeEvent!(e);
 	res ~= ee;
@@ -158,9 +146,9 @@ struct RequestEvent {
 		m_url = url;
 	}
 
-	const Event[] resolve() @safe
+	const EventResult resolve() @safe
 	{
-		Event[] res;
+		EventRange res;
 
 		requestUrl(m_url).match!(
 			(ReceiveAsRange stream) => res.append(ToFileEvent(stream, m_url, this.uuid)),
@@ -191,11 +179,11 @@ struct HTMLEvent {
         m_rooturl = root; // the url of the page requested
 	}
 
-	const Event[] resolve() @trusted// TODO safe 
+	const EventResult resolve() @trusted// TODO safe 
 	{
         import arrogant;
 
-		Event[] res;
+		EventRange res;
 
         auto arrogante = Arrogant();
    		auto tree = arrogante.parse(m_content);
@@ -243,13 +231,13 @@ struct ToFileEvent
             base = Base(parent, md5UUID(m_fname));
         }
 
-	const Event[] resolve() @trusted
+	const EventResult resolve() @trusted
 	{
         import vibe.core.file : openFile, FileMode;
         import std.algorithm.iteration : each;
         import std.file : exists, isDir, isFile;
         import std.string : representation;
-		Event[] res;
+		EventRange res;
 
         string fname = m_fname.dup;
 

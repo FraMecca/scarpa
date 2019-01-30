@@ -13,25 +13,62 @@ import sumtype;
 
 import std.range;
 import std.typecons;
+import std.algorithm;
 
-alias ValidEvent = SumType!(Event, Flag!"event");
+struct BinnedPQ {
+	EventRange[EventType] bins;
+
+	@property bool empty() @safe
+	{
+		foreach(bin; bins) {
+			if(!bin.empty) return false;
+		}
+		return true;
+	}
+
+	@property Event front() @safe
+	{
+		import std.stdio;
+		static foreach_reverse(T; EventSeq) {
+			mixin("if(EventType."~T.stringof~" in bins && !bins[EventType."~T.stringof~"].empty)
+					return bins[EventType."~T.stringof~"].front;");
+		}
+		assert(false, "Cannot return front from an empty BinnedPQ");
+	}
+
+	void popFront() @safe
+	{
+		static foreach_reverse(T; EventSeq) {
+			mixin("if(EventType."~T.stringof~" in bins && !bins[EventType."~T.stringof~"].empty)
+					{ bins[EventType."~T.stringof~"].popFront(); return; }");
+		}
+		assert(false, "Cannot pop front from an empty BinnedPQ");
+	}
+
+	void put(Event ev) @safe
+	{
+		ev.match!(
+				(RequestEvent e) => bins[EventType.RequestEvent] ~= makeEvent!e,
+				(HTMLEvent e) => bins[EventType.HTMLEvent] ~= makeEvent!e,
+				(inout ToFileEvent e) => bins[EventType.ToFileEvent] ~= makeEvent!e
+				);
+	}
+}
 
 // TODO handle update / existing files
 struct Storage {
 	import d2sqlite3;
-	import containers;
-	import std.container : BinaryHeap;
 
 	Database db;
 	//HashMap!(string, Future!(Event[])) tasks;
 	Future!(Event[])[string] tasks;
-	Event[] queue;
+	BinnedPQ queue; // TODO priority queue
 	Tid mainTid;
 
 	this(const string location, Event first, Tid tid) @trusted
 	{
 		db = createDB(location);
-		queue ~= first;
+		queue.put(first);
 		mainTid = tid;
 	}
 
@@ -40,30 +77,39 @@ struct Storage {
 		return queue.empty;
 	}
 
-	ValidEvent getEvent() @trusted
+	@property Event front() @trusted
 	{
-		auto ev = queue.front;
-		queue.popFront();
+		assert(!empty(), "Cannot fetch front from an empty Storage Range");
 
-		if(db.testEvent(ev) && !queue.empty) {
-			return getEvent();
+		return queue.front;
+	}
 
-		} else if(!db.testEvent(ev)) {
-			db.insertEvent(ev);
-			return ValidEvent(ev);
-
+	@property bool toSkip(Event ev) @trusted
+	{
+		if(db.testEvent(ev)) {
+			return true;
 		} else {
-			return ValidEvent(No.event);
+			return false;
 		}
+	}
+
+	void popFront() @safe
+	{
+		assert(!empty(), "Cannot pop the front from an empty Storage Range");
+		queue.popFront();
 	}
 
 	void put(Event ev) @safe
 	{
-		queue ~= ev;
+		if(toSkip(ev)) return;
+		queue.put(ev);
 	}
 
 	void fire(Event ev) @trusted
 	{
+		assert(!toSkip(ev));
+
+		db.insertEvent(ev);
 		auto uuid = ev.uuid.get.toString;
 
 		auto go() {
@@ -114,14 +160,10 @@ int main(string[] args)
 	const uint NEVENTS = 2; // TODO remove, debug purpose
     while(true){
 		uint ne;
-        while(!storage.empty && ne < NEVENTS){
-            auto ev = storage.getEvent();
-			ev.match!(
-				(Event e) => storage.fire(e),
-				(Flag!"event" f) => warning("No events in list")
-				);
-			ne++;
-        }
+		storage
+			.take(NEVENTS)
+			.filter!((Event e) => !storage.toSkip(e))
+			.each!((Event e) => storage.fire(e));
 
         // receive result (from first available)
         auto uuid = receiveOnly!string();
@@ -132,6 +174,4 @@ int main(string[] args)
             storage.put(e);
 		}
     }
-
-	// return 0;
 }

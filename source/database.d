@@ -43,9 +43,9 @@ void insertEvent(ref Database db, Event e) @trusted
 				VALUES (:type, :resolved, :uuid, :parent, :data)"
 			);
 	statement.bind(":type", e.match!(
-				 (RequestEvent _ev) => Type.RequestEvent,
-				 (HTMLEvent _ev) => Type.HTMLEvent,
-				 (inout ToFileEvent _ev) => Type.ToFileEvent,
+				 (RequestEvent _ev) => EventType.RequestEvent,
+				 (HTMLEvent _ev) => EventType.HTMLEvent,
+				 (inout ToFileEvent _ev) => EventType.ToFileEvent,
 			));
 	statement.bind(":resolved", e.match!(
 				 (RequestEvent _ev) => _ev.requestOver,
