@@ -1,14 +1,13 @@
 module events;
 
 import parse;
+import io;
 import config : config;
 import logger;
 
 import sumtype;
 import ddash.functional : cond;
-import std.io;
 import requests;
-// import stdx.data.json;
 
 import std.stdio : writeln;
 import std.conv : to;
@@ -233,34 +232,23 @@ struct ToFileEvent
 
 	const EventResult resolve() @trusted
 	{
-        import vibe.core.file : openFile, FileMode;
-        import std.algorithm.iteration : each;
-        import std.file : exists, isDir, isFile;
-        import std.string : representation;
+        // import std.file : exists, isDir, isFile;
+        import vibe.core.path;
 		EventRange res;
 
-        string fname = m_fname.dup;
+        auto fname = PosixPath(m_fname);
 
-		fname.makeDir();
+		fname.parentPath.makeDirRecursive();
 
-		if(fname.exists && !fname.isFile) {
-			m_fname.cond!(
-				f => f.isDir, (f) { fname = handleDirExists(f); },
-				{ throw new Exception("Special file"); }
-				);
-		}
+		// if(fname.exists && !fname.isFile) {
+		// 	m_fname.cond!(
+		// 		f => f.isDir, (f) { fname = handleDirExists(f); },
+		// 		{ throw new Exception("Special file"); }
+		// 		);
+		// }
 
-        auto fp = openFile(fname, FileMode.append);
-		m_content.match!(
-				(const string s) {
-					fp.write(s.representation);
-					},
-				(const ReceiveAsRange cr) {
-                    auto r = cast(ReceiveAsRange)cr; // cannot use bcs const
-					r.each!((e) => fp.write(e));
-					// TODO check file type in case of binary
-					}
-				);
+        fname.writeToFile(m_content);
+        // TODO check file type in case of binary
         return res;
 	}
 

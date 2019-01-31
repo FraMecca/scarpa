@@ -1,20 +1,25 @@
 module parse;
 
 import scarpa;
-import magic;
 import config;
 
 import requests;
-import ddash.functional;
+import ddash.functional : cond;
 import sumtype;
 
-// import std.file;
-import std.file : mkdirRecurse, /*exists,*/ isFile, isDir/*, rename*/; // TODO : vibe
-import vibe.core.file : exists = existsFile, rename = moveFile;
-import std.exception: enforce;
-import std.string;
 import std.typecons : Tuple, tuple;
+import std.algorithm.searching : startsWith, endsWith;
+import std.string : stripLeft, lastIndexOf, count;
+import std.range : empty;
 
+/**
+ * Module that contains functions related to HTTP, URL schema and HTTP
+ */
+
+/**
+ * Parse an URL and
+ * return a tuple of URL, pathname
+ */
 alias ParseResult = Tuple!(string, "url", string, "fname");
 alias parseResult = tuple!("url", "fname");
 ParseResult parseUrl(const string url, const string absRooturl)
@@ -51,6 +56,9 @@ unittest{
     assert(p == parseResult("http://example.com/about", "../example.com/about"), p.to!string);
 }
 
+/**
+ * Converts an URL to a path on the disk
+ */
 string toFileName(const string url, const string absRooturl = "", const bool addIndex = true) @safe
 in{
     import std.algorithm.searching : canFind;
@@ -90,6 +98,12 @@ unittest{
 	assert("https://fragal.eu".toFileName == "fragal.eu/index.html");
 }
 
+/**
+ * The anchor character '#' is correctly parsed by
+ * the html library while effectively being
+ * the same html page referring to one of its div.
+ * This function strips the '#'
+ */
 string removeAnchor(const string src) @safe
 {
     auto idx = src.lastIndexOf('#');
@@ -120,6 +134,10 @@ bool isValidHref(const string href)
     );
 }
 
+/**
+ * Parse the HTTP headers
+ * and return true if we are dealing with an HTML file
+ */
 bool isHTMLFile(string[string] headers) @safe
 {
 	return /*"content-length" in headers &&*/ // TODO investigate
@@ -129,6 +147,11 @@ bool isHTMLFile(string[string] headers) @safe
 			headers["content-type"].startsWith("text/html;"));
 }
 
+/**
+ * Make an HTTP request given the URL.
+ * Either fetch the entire content as a string if it is an HTML page
+ * or return an OutputRange containing binary data
+ */
 SumType!(ReceiveAsRange, string) requestUrl(const string url) @trusted
 {
     import std.utf;
@@ -152,50 +175,4 @@ SumType!(ReceiveAsRange, string) requestUrl(const string url) @trusted
 	}
 
 	return ret;
-}
-
-void makeDir(const string path)
-in{
-    assert(path.lastIndexOf('/') > 0, path);
-} do
-{
-	import std.string : lastIndexOf;
-
-	auto dir = path[0..(path.lastIndexOf('/'))];
-	dir.cond!(
-		d => d.exists && d.isFile, d => handleFileExists(d),
-		d => d.exists && !d.isDir, { throw new Exception("Special file"); },
-        d => d.exists, {},
-		d => d.mkdirRecurse
-	);
-}
-
-/** handle cases in which:
-  * 1. a html file was saved, but a directory has to be created
-  * Moves the file to DIR/index.html, creating DIR
-  * throws if file is not HTML OR is POSIX special file
-*/
-void handleFileExists(const string path)
-in {
-	assert(path.isFile, "Given path is not a file");
-}
-do {
-
-	enforce(path.magicType.startsWith("text/html"), "Given path is not an HTML file.");
-
-    string tname = "." ~ path[(path.lastIndexOf('/')+1)..$] ~ ".tmp";
-    path.rename(tname);
-    mkdirRecurse(path);
-    tname.rename(path ~ "/index.html");
-    // TODO checks?
-}
-/** 2. a directory exists and a html file with the same name has to be written
-  * (returns DIR/index.html)
-*/
-string handleDirExists(const string path)
-in {
-	assert(path.isDir, "Given path is not a directory");
-}
-do {
-	return path ~ "/index.html";
 }

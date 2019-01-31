@@ -1,6 +1,7 @@
 module scarpa;
 
 import parse;
+import io;
 import database;
 import events;
 import logger;
@@ -141,7 +142,7 @@ int main(string[] args)
 	parseCli(args).cond!(
 		CLIResult.HELP_WANTED, { exit = true; },
 		CLIResult.NEW_PROJECT, {
-            makeDir(config.projdir);
+            makeDirRecursive(config.projdir);
             dumpConfig();
         },
 		CLIResult.RESUME_PROJECT, { writeln("Resume this project"); }, // TODO import data from db
