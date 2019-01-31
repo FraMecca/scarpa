@@ -8,8 +8,9 @@ import sumtype : SumType, match;
 import requests : ReceiveAsRange;
 
 import std.exception: enforce;
-import std.string;
 import std.typecons : Tuple, tuple;
+
+// TODO : manage special files
 
 /**
  * Functions related to disk I/O
@@ -147,7 +148,7 @@ void writeToFile(const PosixPath fname, inout FileContent content)
  * Either fetch the entire content as a string if it is an HTML page
  * or return an OutputRange containing binary data
  */
-SumType!(ReceiveAsRange, string) requestUrl(const string url) @trusted
+FileContent requestUrl(const string url) @trusted
 {
     import requests : Request;
     import parse : isHTMLFile;

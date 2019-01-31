@@ -56,14 +56,14 @@ struct BinnedPQ {
 	}
 }
 
-// TODO handle update / existing files
+// TODO handle update / existing files in the projdirectory before starting the program
 struct Storage {
 	import d2sqlite3;
 
 	Database db;
 	//HashMap!(string, Future!(Event[])) tasks;
 	Future!(EventResult)[string] tasks;
-	BinnedPQ queue; // TODO priority queue
+	BinnedPQ queue;
 	Tid mainTid;
 
 	this(const string location, Event first, Tid tid) @trusted

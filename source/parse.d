@@ -4,7 +4,6 @@ import scarpa;
 import config;
 
 import ddash.functional : cond;
-import sumtype;
 
 import std.typecons : Tuple, tuple;
 import std.algorithm.searching : startsWith, endsWith;
