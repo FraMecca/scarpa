@@ -6,9 +6,9 @@ import logger;
 
 import sumtype;
 import ddash.functional : cond;
-import std.io;
+import ddash.utils : Expect;
+import vibe.core.sync;
 import requests;
-// import stdx.data.json;
 
 import std.stdio : writeln;
 import std.conv : to;
@@ -24,7 +24,7 @@ enum EventType { // order of execution for BinnedPQ
 };
 
 alias EventRange = Event[];
-alias EventResult = EventRange;
+alias EventResult = Expect!(EventRange, string);
 alias EventSeq = AliasSeq!(RequestEvent, HTMLEvent, ToFileEvent);
 
 struct _Event{
@@ -75,14 +75,18 @@ struct _Event{
             (const ToFileEvent _ev) => _ev.uuid);
     }
 
-    const resolve() @safe
+    const EventResult resolve() @safe
     {
 		log(this.toString);
-
-        return ev.match!(
-            (RequestEvent _ev) => _ev.resolve(),
-            (HTMLEvent _ev) => _ev.resolve(),
-            (const ToFileEvent _ev) => _ev.resolve());
+		try {
+			return typeof(return).expected(ev.match!(
+					(RequestEvent _ev) => _ev.resolve(),
+					(HTMLEvent _ev) => _ev.resolve(),
+					(const ToFileEvent _ev) => _ev.resolve()));
+		} catch (Exception e) {
+			import std.conv : to;
+			return typeof(return).unexpected(e.file ~":"~e.line.to!string~" "~e.msg);
+		}
     }
 
 	auto hashOf() @safe
@@ -146,7 +150,7 @@ struct RequestEvent {
 		m_url = url;
 	}
 
-	const EventResult resolve() @safe
+	const EventRange resolve() @safe
 	{
 		EventRange res;
 
@@ -179,7 +183,7 @@ struct HTMLEvent {
         m_rooturl = root; // the url of the page requested
 	}
 
-	const EventResult resolve() @trusted// TODO safe 
+	const EventRange resolve() @trusted// TODO safe 
 	{
         import arrogant;
 
@@ -231,12 +235,14 @@ struct ToFileEvent
             base = Base(parent, md5UUID(m_fname));
         }
 
-	const EventResult resolve() @trusted
+	const EventRange resolve() @trusted
 	{
         import vibe.core.file : openFile, FileMode;
         import std.algorithm.iteration : each;
         import std.file : exists, isDir, isFile;
         import std.string : representation;
+		import parse : file_mutex;
+
 		EventRange res;
 
         string fname = m_fname.dup;
@@ -257,8 +263,11 @@ struct ToFileEvent
 					},
 				(const ReceiveAsRange cr) {
                     auto r = cast(ReceiveAsRange)cr; // cannot use bcs const
-					r.each!((e) => fp.write(e));
-					// TODO check file type in case of binary
+					file_mutex.performLocked!({
+						r.each!((e) => fp.write(e));
+						// TODO check file type in case of binary
+						}
+					);
 					}
 				);
         return res;

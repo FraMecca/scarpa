@@ -11,12 +11,19 @@ import sumtype;
 // import std.file;
 import std.file : mkdirRecurse, /*exists,*/ isFile, isDir/*, rename*/; // TODO : vibe
 import vibe.core.file : exists = existsFile, rename = moveFile;
+import vibe.core.sync;
 import std.exception: enforce;
 import std.string;
 import std.typecons : Tuple, tuple;
 
 alias ParseResult = Tuple!(string, "url", string, "fname");
 alias parseResult = tuple!("url", "fname");
+
+RecursiveTaskMutex file_mutex;
+
+static this() {
+	file_mutex = new RecursiveTaskMutex;
+}
 ParseResult parseUrl(const string url, const string absRooturl)
 in{
     assert(absRooturl.startsWith("http://") || absRooturl.startsWith("https://"), absRooturl);
@@ -162,11 +169,13 @@ in{
 	import std.string : lastIndexOf;
 
 	auto dir = path[0..(path.lastIndexOf('/'))];
-	dir.cond!(
-		d => d.exists && d.isFile, d => handleFileExists(d),
-		d => d.exists && !d.isDir, { throw new Exception("Special file"); },
-        d => d.exists, {},
-		d => d.mkdirRecurse
+	file_mutex.performLocked!({
+		dir.cond!(
+			d => d.exists && d.isFile, d => handleFileExists(d),
+			d => d.exists && !d.isDir, { throw new Exception("Special file"); },
+			d => d.exists, {},
+			d => d.mkdirRecurse // TODO create directory recursively to avoid files in path
+		);}
 	);
 }
 
@@ -180,13 +189,17 @@ in {
 	assert(path.isFile, "Given path is not a file");
 }
 do {
+	import vibe.core.file;
+	import config : config;
 
 	enforce(path.magicType.startsWith("text/html"), "Given path is not an HTML file.");
 
-    string tname = "." ~ path[(path.lastIndexOf('/')+1)..$] ~ ".tmp";
-    path.rename(tname);
-    mkdirRecurse(path);
-    tname.rename(path ~ "/index.html");
+	file_mutex.performLocked!({
+		string tname = config.projdir ~ "." ~ path[(path.lastIndexOf('/')+1)..$] ~ ".tmp";
+		path.moveFile(tname);
+		mkdirRecurse(path);
+		tname.moveFile(path ~ "/index.html");
+		});
     // TODO checks?
 }
 /** 2. a directory exists and a html file with the same name has to be written

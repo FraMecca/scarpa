@@ -61,7 +61,7 @@ struct Storage {
 
 	Database db;
 	//HashMap!(string, Future!(Event[])) tasks;
-	Future!(Event[])[string] tasks;
+	Future!(EventResult)[string] tasks;
 	BinnedPQ queue; // TODO priority queue
 	Tid mainTid;
 
@@ -134,6 +134,7 @@ events:
 */
 int main(string[] args)
 {
+	import ddash.utils;
     import std.range;
 	import std.stdio : writeln, stderr;
 	bool exit;
@@ -159,19 +160,27 @@ int main(string[] args)
 
 	const uint NEVENTS = 2; // TODO remove, debug purpose
     while(true){
-		uint ne;
+		uint cnt_event;
 		storage
-			.take(NEVENTS)
+			.take(NEVENTS-cnt_event)
 			.filter!((Event e) => !storage.toSkip(e))
+			//.tee((Event e) => log(1))
 			.each!((Event e) => storage.fire(e));
+		cnt_event = NEVENTS-cnt_event;
 
         // receive result (from first available)
         auto uuid = receiveOnly!string();
-        auto newEvents = storage.tasks[uuid].getResult();
-
-        // enqueue
-        foreach (e; newEvents) {
-            storage.put(e);
-		}
+		cnt_event--;
+		storage.tasks[uuid]
+			.getResult()
+			.match!(
+				(EventRange r) {
+					// enqueue
+					foreach (e; r) {
+						storage.put(e);
+					}
+				},
+				(Unexpected!string s) => fatal(s)
+			);
     }
 }
