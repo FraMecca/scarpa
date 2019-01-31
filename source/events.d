@@ -7,6 +7,7 @@ import logger;
 
 import sumtype;
 import ddash.functional : cond;
+import ddash.utils : Expect;
 import requests;
 
 import std.stdio : writeln;
@@ -23,7 +24,7 @@ enum EventType { // order of execution for BinnedPQ
 };
 
 alias EventRange = Event[];
-alias EventResult = EventRange;
+alias EventResult = Expect!(EventRange, string);
 alias EventSeq = AliasSeq!(RequestEvent, HTMLEvent, ToFileEvent);
 
 struct _Event{
@@ -74,14 +75,23 @@ struct _Event{
             (const ToFileEvent _ev) => _ev.uuid);
     }
 
-    const resolve() @safe
+    const EventResult resolve() @safe
     {
 		log(this.toString);
-
-        return ev.match!(
-            (RequestEvent _ev) => _ev.resolve(),
-            (HTMLEvent _ev) => _ev.resolve(),
-            (const ToFileEvent _ev) => _ev.resolve());
+		try {
+			return typeof(return).expected(ev.match!(
+					(RequestEvent _ev) => _ev.resolve(),
+					(HTMLEvent _ev) => _ev.resolve(),
+					(const ToFileEvent _ev) => _ev.resolve()));
+		} catch (Exception e) {
+            debug{
+                warning(e.info);
+                import std.conv : to;
+                return typeof(return).unexpected(e.file ~":"~e.line.to!string~" "~e.msg);
+            } else {
+                return typeof(return).unexpected(e.msg);
+            }
+		}
     }
 
 	auto hashOf() @safe
@@ -145,7 +155,7 @@ struct RequestEvent {
 		m_url = url;
 	}
 
-	const EventResult resolve() @safe
+	const EventRange resolve() @safe
 	{
 		EventRange res;
 
@@ -178,7 +188,7 @@ struct HTMLEvent {
         m_rooturl = root; // the url of the page requested
 	}
 
-	const EventResult resolve() @trusted// TODO safe 
+	const EventRange resolve() @trusted// TODO safe 
 	{
         import arrogant;
 
@@ -219,7 +229,7 @@ struct ToFileEvent
 		m_content = content;
         m_rooturl = url;
 		m_fname = config.projdir ~ url.toFileName;
-        base = Base(parent, md5UUID(m_fname));
+        base = Base(parent, md5UUID(m_rooturl));
 	}
 
 	this(string content, const string url, const ID parent) @safe
@@ -230,23 +240,13 @@ struct ToFileEvent
             base = Base(parent, md5UUID(m_fname));
         }
 
-	const EventResult resolve() @trusted
+	const EventRange resolve() @trusted
 	{
-        // import std.file : exists, isDir, isFile;
-        import vibe.core.path;
+        import vibe.core.path : PosixPath;
 		EventRange res;
 
         auto fname = PosixPath(m_fname);
-
 		fname.parentPath.makeDirRecursive();
-
-		// if(fname.exists && !fname.isFile) {
-		// 	m_fname.cond!(
-		// 		f => f.isDir, (f) { fname = handleDirExists(f); },
-		// 		{ throw new Exception("Special file"); }
-		// 		);
-		// }
-
         fname.writeToFile(m_content);
         // TODO check file type in case of binary
         return res;

@@ -3,7 +3,6 @@ module parse;
 import scarpa;
 import config;
 
-import requests;
 import ddash.functional : cond;
 import sumtype;
 
@@ -22,6 +21,7 @@ import std.range : empty;
  */
 alias ParseResult = Tuple!(string, "url", string, "fname");
 alias parseResult = tuple!("url", "fname");
+
 ParseResult parseUrl(const string url, const string absRooturl)
 in{
     assert(absRooturl.startsWith("http://") || absRooturl.startsWith("https://"), absRooturl);
@@ -145,34 +145,4 @@ bool isHTMLFile(string[string] headers) @safe
 		    "content-type" in headers &&
 			(headers["content-type"] == "text/html" ||
 			headers["content-type"].startsWith("text/html;"));
-}
-
-/**
- * Make an HTTP request given the URL.
- * Either fetch the entire content as a string if it is an HTML page
- * or return an OutputRange containing binary data
- */
-SumType!(ReceiveAsRange, string) requestUrl(const string url) @trusted
-{
-    import std.utf;
-	import std.array : appender;
-	import std.algorithm.iteration : each;
-
-	typeof(return) ret;
-
-
-	auto rq = Request();
-	rq.useStreaming = true;
-    rq.sslSetCaCert("/etc/ssl/cert.pem"); // TODO manage
-	auto rs = rq.get(url);
-	auto resBody = appender!(string);
-
-	if (rs.responseHeaders.isHTMLFile) {
-		rs.receiveAsRange().each!(e => resBody.put(e));
-		ret = resBody.data;
-	} else {
-		ret = rs.receiveAsRange();
-	}
-
-	return ret;
 }
