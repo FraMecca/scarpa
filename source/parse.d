@@ -2,6 +2,7 @@ module parse;
 
 import scarpa;
 import config;
+import io;
 
 import ddash.functional : cond;
 
@@ -21,7 +22,7 @@ import std.range : empty;
 alias ParseResult = Tuple!(string, "url", string, "fname");
 alias parseResult = tuple!("url", "fname");
 
-ParseResult parseUrl(const string url, const string absRooturl)
+ParseResult parseUrl(const string url, const string absRooturl) @safe
 in{
     assert(absRooturl.startsWith("http://") || absRooturl.startsWith("https://"), absRooturl);
     assert(url.startsWith("http://") || url.startsWith("https://") || url.startsWith("/"), url);
@@ -121,15 +122,14 @@ unittest{
 /**
    Different value checks for valid href url
 */
-bool isValidHref(const string href)
+bool isValidHref(const string href) @safe
 {
     return href.cond!(
-                      h => h.removeAnchor == "", false,
-                      h => h.startsWith("/"), true,
-                      h => h.startsWith("http://"), true,
-                      h => h.startsWith("https://"), true,
-                      false
-
+        h => h.removeAnchor == "", false,
+        h => h.startsWith("/"), true,
+        h => h.startsWith("http://"), true,
+        h => h.startsWith("https://"), true,
+        false
     );
 }
 

@@ -17,14 +17,15 @@ import std.typecons : Tuple, tuple;
  */
 
 alias existsDir = existsFile;
+alias Path = PosixPath;
 
 /**
  * Create a directory.
  * Recur if the parent is a file or it does not exist.
  */
-void makeDirRecursive(const PosixPath src)
+void makeDirRecursive(const Path src)
 {
-    auto path = src.endsWithSlash ? PosixPath(src.toString[0 .. $-1]) : src;
+    auto path = src.endsWithSlash ? Path(src.toString[0 .. $-1]) : src;
 
     auto parent = path.parentPath;
     if(!parent.existsDir) makeDirRecursive(parent);
@@ -58,7 +59,7 @@ in{
     assert(fpath.lastIndexOf('/') > 0, fpath);
 } do
 {
-    auto path = PosixPath(fpath);
+    auto path = Path(fpath);
     makeDirRecursive(path);
 }
 
@@ -68,7 +69,7 @@ in{
   * Moves the file to DIR/index.html, creating DIR
   * throws if file is not HTML OR is POSIX special file
 */
-void handleFileExists(const PosixPath path)
+void handleFileExists(const Path path)
 in {
     import std.file : isFile;
 	assert(path.toString.isFile, "Given path is not a file");
@@ -84,10 +85,10 @@ do {
 	enforce(path.toString.magicType.startsWith("text/html"), "Given path is not an HTML file.");
 
     auto tmp = tempDir;
-    auto tname = PosixPath(tmp ~ "/" ~ path.head.name ~ "." ~ rndGen.front.to!string);
+    auto tname = Path(tmp ~ "/" ~ path.head.name ~ "." ~ rndGen.front.to!string);
     path.moveFile(tname, true);
     makeDirRecursive(path);
-    auto dst = PosixPath(path.toString ~ "/index.html");
+    auto dst = Path(path.toString ~ "/index.html");
     tname.moveFile(dst, true);
 }
 
@@ -95,13 +96,13 @@ do {
  * a directory exists and a html file with the same name has to be written
  * returns DIR/index.html
 */
-PosixPath handleDirExists(const PosixPath path)
+Path handleDirExists(const Path path) @safe
 in {
     import std.file : isDir;
 	assert(path.toString.isDir, "Given path is not a directory");
 }
 do {
-	return PosixPath(path.toString ~ "/index.html");
+	return Path(path.toString ~ "/index.html");
 }
 
 alias FileContent = SumType!(ReceiveAsRange, string);
@@ -112,20 +113,20 @@ alias FileContent = SumType!(ReceiveAsRange, string);
  * it overwrites the file in case two url that differ only bcs of the trailing slash
  * are found
  */
-void writeToFile(const PosixPath fname, inout FileContent content)
+void writeToFile(const Path fname, inout FileContent content)
 {
     import vibe.core.file : openFile, FileMode, createTempFile;
     import std.string : representation;
     import std.algorithm.iteration : each;
 
-    PosixPath manageSlash(const PosixPath path)
+    Path manageSlash(const Path path)
     {
         assert(fname.existsFile);
         auto info = getFileInfo(path);
         return info.cond!(
             i => i.isDirectory, { return handleDirExists(path); },
             // special file
-                { return path; }
+            { return path; }
             );
     }
 
@@ -158,12 +159,11 @@ FileContent requestUrl(const string url) @trusted
 
 	typeof(return) ret;
 
-
 	auto rq = Request();
 	rq.useStreaming = true;
     rq.sslSetCaCert("/etc/ssl/cert.pem"); // TODO manage
 	auto rs = rq.get(url);
-	auto resBody = appender!(string);
+	auto resBody = appender!string;
 
 	if (rs.responseHeaders.isHTMLFile) {
 		rs.receiveAsRange().each!(e => resBody.put(e));
