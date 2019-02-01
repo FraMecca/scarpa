@@ -145,6 +145,18 @@ void writeToFile(const Path fname, inout FileContent content)
 }
 
 /**
+ * Read from File.
+ */
+string readFromFile(const Path fname)
+{
+    import vibe.core.file : readFile;
+    import std.string : assumeUTF;
+
+    auto content = fname.readFile;
+    return content.assumeUTF;
+}
+
+/**
  * Make an HTTP request given the URL.
  * Either fetch the entire content as a string if it is an HTML page
  * or return an OutputRange containing binary data

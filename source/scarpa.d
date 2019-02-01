@@ -61,12 +61,11 @@ struct Storage {
 	import d2sqlite3;
 
 	Database db;
-	//HashMap!(string, Future!(Event[])) tasks;
 	Future!(EventResult)[string] tasks;
 	BinnedPQ queue;
 	Tid mainTid;
 
-	this(const string location, Event first, Tid tid) @trusted
+	this(const string location, Event first, Tid tid) @safe
 	{
 		db = createDB(location);
 		queue.put(first);
@@ -78,20 +77,19 @@ struct Storage {
 		return queue.empty;
 	}
 
-	@property Event front() @trusted
+	@property Event front() @safe
 	{
 		assert(!empty(), "Cannot fetch front from an empty Storage Range");
 
 		return queue.front;
 	}
 
-	@property bool toSkip(Event ev) @trusted
+	@property bool toSkip(Event ev) @safe
 	{
-		if(db.testEvent(ev)) {
-			return true;
-		} else {
-			return false;
-		}
+		if(db.testEvent(ev))
+            return true;
+		else
+            return false;
 	}
 
 	void popFront() @safe
@@ -121,7 +119,6 @@ struct Storage {
 		}
 
 		auto task = async(&go);
-
 		tasks[uuid] = task;
 	}
 }
@@ -132,13 +129,6 @@ debug{
     alias logException = error;
  }
 
-/**
-events:
-1. request to website
-2. parse links -> find links -> to .1
-3. translation links -> files
-4. save to disk
-*/
 int main(string[] args)
 {
 	import ddash.utils;
@@ -165,27 +155,23 @@ int main(string[] args)
     auto first = firstEvent(config.rootUrl);
 	auto storage = Storage(config.projdir ~ "/scarpa.db", first, thisTid);
 
-	const uint NEVENTS = 2; // TODO remove, debug purpose
+	const uint NEVENTS = 20; // TODO remove, debug purpose
     while(true){
 		uint cnt_event;
 		storage
 			.take(NEVENTS-cnt_event)
 			.filter!((Event e) => !storage.toSkip(e))
-			//.tee((Event e) => log(1))
 			.each!((Event e) => storage.fire(e));
 		cnt_event = NEVENTS-cnt_event;
 
         // receive result (from first available)
-        auto uuid = receiveOnly!string();
+        auto uuid = receiveOnly!string;
 		cnt_event--;
 		storage.tasks[uuid]
 			.getResult()
 			.match!(
 				(EventRange r) {
-					// enqueue
-					foreach (e; r) {
-						storage.put(e);
-					}
+                    r.each!(e => storage.put(e)); // enqueue
 				},
 				(Unexpected!string s) => logException(s)
 			);

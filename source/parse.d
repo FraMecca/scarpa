@@ -145,3 +145,13 @@ bool isHTMLFile(string[string] headers) @safe
 			(headers["content-type"] == "text/html" ||
 			headers["content-type"].startsWith("text/html;"));
 }
+
+/**
+ * Parse the header of a file on disk using libmagic
+ * and return true if we are dealing with an HTML file
+ */
+bool isHTMLFile(Path path) @safe
+{
+    import magic;
+	return path.toString.magicType.startsWith("text/html");
+}

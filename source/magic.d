@@ -2,7 +2,7 @@
 import std.string: toStringz;
 import std.exception : enforce;
 
-string magicType(const string path)
+string magicType(const string path) @trusted
 {
 	char[32] dst;
 	auto rc = magic_type(path.toStringz, dst);

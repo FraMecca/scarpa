@@ -147,7 +147,6 @@ struct RequestEvent {
 	private string m_url;
     Base base;
     alias base this;
-	bool requestOver = false;
 
 	this(const string url, const ID parent = ID()) @safe
 	{
@@ -242,13 +241,21 @@ struct ToFileEvent
 
 	const EventRange resolve() @trusted
 	{
-        import vibe.core.path : PosixPath;
 		EventRange res;
 
-        auto fname = PosixPath(m_fname);
+        auto fname = Path(m_fname);
 		fname.parentPath.makeDirRecursive();
         fname.writeToFile(m_content);
-        // TODO check file type in case of binary
+        m_content.match!(
+            (string s) {},
+            (const ReceiveAsRange r) {
+                if(config.checkFileAfterSave && isHTMLFile(fname)){
+                    string content = readFromFile(fname);
+                    res.append(HTMLEvent(content, m_rooturl, uuid));
+                }
+            }
+        );
+
         return res;
 	}
 

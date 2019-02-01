@@ -28,9 +28,11 @@ auto createDB(const string location) @trusted
     return db;
 }
 
-/** resolved is used to resume interrupted work.
+/** This function inserts an event in the database
+  * resolved is used to resume interrupted work.
   * HTML/FILE events are always the result of a single request event.
-  * Request events need to be marked as `over` when its only child is resolved.
+  * Request events need to be marked as `over` when
+  * its only grandchild (ToFileEvent) is resolved.
 */
 void insertEvent(ref Database db, Event e) @trusted
 {
@@ -39,19 +41,19 @@ void insertEvent(ref Database db, Event e) @trusted
 	auto uuid = e.uuid.get.toString;
 
 	Statement statement = db.prepare(
-				"INSERT INTO Event (type, resolved, uuid, parent, data)
-				VALUES (:type, :resolved, :uuid, :parent, :data)"
-			);
+        "INSERT INTO Event (type, resolved, uuid, parent, data)
+        VALUES (:type, :resolved, :uuid, :parent, :data)"
+    );
 	statement.bind(":type", e.match!(
-				 (RequestEvent _ev) => EventType.RequestEvent,
-				 (HTMLEvent _ev) => EventType.HTMLEvent,
-				 (inout ToFileEvent _ev) => EventType.ToFileEvent,
-			));
+          (RequestEvent _ev) => EventType.RequestEvent,
+          (HTMLEvent _ev) => EventType.HTMLEvent,
+          (inout ToFileEvent _ev) => EventType.ToFileEvent,
+    ));
 	statement.bind(":resolved", e.match!(
-				 (RequestEvent _ev) => _ev.requestOver,
-				 (HTMLEvent _ev) => true,
-				 (const ToFileEvent _ev) => true,
-			));
+          (RequestEvent _ev) => false,
+          (HTMLEvent _ev) => true,
+          (const ToFileEvent _ev) => true,
+    ));
 	statement.bind(":uuid", uuid);
 	statement.bind(":parent", parent);
 	statement.bind(":data", e.toJson.toString());
@@ -60,26 +62,35 @@ void insertEvent(ref Database db, Event e) @trusted
 	statement.reset(); // Need to reset the statement after execution.
 
 
-    void updateParent(Database db, ID parent)
+    void updateGrandParent(Database db, ID parent)
     {
-        if (e.parent.isNull) return;
-        Statement statement = db.prepare(
-                                         "UPDATE Event
-				SET resolved = 1
-				WHERE uuid = :uuid"
-                                         );
+        // get grandparent uuid
+        Statement grandP = db.prepare("select uuid from Event
+            where uuid = :uuid");
+        grandP.bind(":uuid", parent.toString);
+        auto requestEventId = grandP.execute().oneValue!string;
+        grandP.reset();
 
-        statement.bind(":uuid", parent.toString);
+        Statement setResolved = db.prepare(
+           "UPDATE Event
+            SET resolved = 1
+            WHERE uuid = :uuid"
+        );
 
-        statement.execute();
-        statement.reset(); // Need to reset the statement after execution.
+        setResolved.bind(":uuid", requestEventId);
+        setResolved.execute();
+        setResolved.reset(); // Need to reset the statement after execution.
     }
 
-    updateParent(db, e.parent);
+	e.match!(
+             (RequestEvent _ev) {},
+             (HTMLEvent _ev) {},
+             (inout ToFileEvent _ev) { updateGrandParent(db, e.parent); },
+    );
 }
 
 /**
- * check if request event was over
+ * check if event was stored in db
  */
 bool testEvent(ref Database db, Event ev) @trusted
 {
@@ -99,6 +110,9 @@ bool testEvent(ref Database db, Event ev) @trusted
 	return res;
 }
 
+/**
+ * check if event was stored in db and succesfully stored to disk
+ */
 bool isResolved(ref Database db, Event ev) @trusted
 {
 	auto uuid = ev.uuid.get;
