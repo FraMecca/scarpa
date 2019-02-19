@@ -4,6 +4,7 @@ import parse;
 import io;
 import config : config;
 import logger;
+import url;
 
 import sumtype;
 import ddash.functional : cond;
@@ -42,19 +43,22 @@ struct _Event{
     const JSONValue toJson() @safe
     {
         return ev.match!(
-            (RequestEvent _ev) { 
+            (RequestEvent _ev) {
                 auto j = JSONValue();
-                j["url"] = _ev.m_url;
+                j["url"] = _ev.m_url.toString;
+                j["level"] = _ev.m_level;
                 return j;},
-            (HTMLEvent _ev) { 
+            (HTMLEvent _ev) {
                 auto j = JSONValue();
-                j["url"] = _ev.m_rooturl;
+                j["url"] = _ev.m_rooturl.toString;
+                j["level"] = _ev.m_level;
                 return j;
             },
             (inout ToFileEvent _ev) {
                 auto j = JSONValue();
                 j["fname"] = _ev.m_fname;
-                j["url"] = _ev.m_rooturl;
+                j["url"] = _ev.m_rooturl.toString;
+                j["level"] = _ev.m_level;
                 return j;
             });
     }
@@ -200,12 +204,13 @@ struct HTMLEvent {
         foreach(ref node; tree.byTagName("a")){
             if(!node["href"].isNull && node["href"].get.isValidHref){
                 auto tup = parseUrl(node["href"].get(), m_rooturl);
-                res.append(RequestEvent(tup.url, this.parent));
+                if(couldRecur(tup.url, m_level + 1))
+                    res.append(RequestEvent(tup.url, m_level + 1, this.parent));
                 node["href"] = tup.fname; // replace with a filename on disk
             }
         }
 		string s = tree.document.innerHTML;
-        res.append(ToFileEvent(s, m_rooturl, this.parent));
+        res.append(ToFileEvent(s, m_rooturl, m_level, this.parent));
 		return res;
 	}
 
@@ -251,7 +256,7 @@ struct ToFileEvent
             (const ReceiveAsRange r) {
                 if(config.checkFileAfterSave && isHTMLFile(fname)){
                     string content = readFromFile(fname);
-                    res.append(HTMLEvent(content, m_rooturl, uuid));
+                    res.append(HTMLEvent(content, m_rooturl, m_level, uuid));
                 }
             }
         );

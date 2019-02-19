@@ -5,7 +5,7 @@ import io;
 import database;
 import events;
 import logger;
-import config : config, parseCli, dumpConfig, CLIResult;
+import config : config, parseCli, CLIResult;
 
 import vibe.core.concurrency;
 import vibe.core.task;
@@ -138,9 +138,10 @@ int main(string[] args)
 
 	parseCli(args).cond!(
 		CLIResult.HELP_WANTED, { exit = true; },
+		CLIResult.ERROR, { exit = true; },
 		CLIResult.NEW_PROJECT, {
-            makeDirRecursive(config.projdir);
-            dumpConfig();
+            // makeDirRecursive(config.projdir);
+            // dumpConfig();
         },
 		CLIResult.RESUME_PROJECT, { writeln("Resume this project"); }, // TODO import data from db
 		CLIResult.NO_ARGS, { stderr.writeln("No arguments specified"); exit = true; },

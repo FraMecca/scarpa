@@ -1,7 +1,7 @@
 module parse;
 
 import scarpa;
-import config;
+import config : config;
 import io;
 import url;
 
@@ -24,7 +24,7 @@ import std.array : split;
  * Parse an URL and
  * return a tuple of URL, pathname
  */
-alias ParseResult = Tuple!(string, "url", string, "fname");
+alias ParseResult = Tuple!(URL, "url", string, "fname");
 alias parseResult = tuple!("url", "fname");
 
 ParseResult parseUrl(const string url, const string absRooturl) @safe
@@ -36,7 +36,7 @@ do{
 	string rooturl = absRooturl.toFileName("", false);
     assert(rooturl);
     string src, dst;
-    // write full path in case of relative urls
+    // write full path in case of isRelative urls
 	src = url.cond!(
 		  u => u.startsWith("/"), u => absRooturl.cond!(
 				a => a.endsWith("/"), a => a[0..$-1] ~ u,
@@ -171,71 +171,127 @@ struct URLRule{
     URL url;
     long level;
     Regex!char rgx;
+    bool isRegex;
+    bool isRelative; // url does not start with http[s]
     ulong length;
     string[] segment;
     alias url this;
 
-    this(inout string ur, inout long lev) @safe {
+    this(inout string ur, inout long lev, bool isRgx) @safe {
+        import std.string : startsWith;
         url = ur.parseURL;
         level = lev;
         rgx = regex(url.host);
         segment = url.path.split('/').filter!(i => i != "").array;
         length = segment.length;
+        isRegex = isRgx;
+        ur.cond!(
+            u => u.startsWith("http://"), { isRelative = false; },
+            u => u.startsWith("https://"), { isRelative = false; },
+            { isRelative = true; }
+        );
+        // debug{
+        //     writeln("Rule: ", ur, " isRegex: ", isRegex, " isRelative: ", isRelative);
+        // }
+    }
+
+    bool matches(const URL url) @safe
+    {
+        import std.regex : matchFirst;
+        return ((isRegex && url.host.matchFirst(this.rgx)) || url.host == this.host) &&
+            (isRelative || (url.scheme == this.scheme && this.port == url.port));
     }
 }
 
 /**
  * check if a given URL respects the rule given
  */
-bool checkLevel(const URLRule rhs, const URL lhs) @safe
+bool checkLevel(const URLRule rhs, const URL lhs, int currentLev = 0) @safe
 {
     import std.regex : matchFirst;
 
-    auto lrg = lhs.path.split('/').filter!(i => i != "");
+    auto lrg = lhs.path.split('/').filter!(i => i != ""); // skips http[s]
     long ldiff = lrg.walkLength - rhs.segment.length;
 
     return
-          lhs.host.matchFirst(rhs.rgx) &&
+        (!rhs.isRegex || lhs.host.matchFirst(rhs.rgx)) &&
         (rhs.providedPort == 0 || lhs.port == rhs.port) &&
         (lhs.scheme == "http" || lhs.scheme == "https") &&
-        ldiff <= rhs.level;
+        ldiff <= rhs.level - currentLev;
 }
 
 /// ditto
-bool checkLevel(const string rhs, const string lhs, const long lev) @safe
+bool checkLevel(const string rhs, const string lhs, const long lev, bool isRegex) @safe
 {
-    auto rule = URLRule(rhs, lev);
+    auto rule = URLRule(rhs, lev, isRegex);
     return checkLevel(rule, lhs.parseURL);
 }
 
 unittest{
-    assert(checkLevel("http://fragal.eu/", "http://fragal.eu", 1));
-    assert(checkLevel("http://fragal.eu/", "http://fragal.eu/a/b/c", 3));
-    assert(!checkLevel("http://fragal.eu/", "http://fragal.eu/a/b/c", 1));
-    assert(checkLevel("http://fragal.eu", "http://fragal.eu/", 1));
-    assert(checkLevel("fragal.eu", "http://fragal.eu/", 1));
-    assert(checkLevel("fragal.eu", "https://fragal.eu/", 1));
-    assert(checkLevel("http://fragal.eu", "http://fragal.eu", 1));
-    assert(checkLevel("fragal.eu", "http://fragal.eu/", 1));
-    assert(checkLevel("http://.*.eu", "fragal.eu", 1));
-    assert(checkLevel("http://.*", "fragal.eu", 1));
-    assert(!checkLevel("http://.*/", "fragal.eu/git", 0));
-    assert(!checkLevel("http://.*.fragal.eu/", "http://fragal.eu/git", 0));
-    assert(!checkLevel("http://.*.eu", "fragal.eu/git", 0));
-    assert(checkLevel("http://.*.eu", "fragal.eu/git", 1));
-    assert(checkLevel("http://.*.fragal.eu", "http://git.fragal.eu", 1));
-    assert(checkLevel(".*.fragal.eu", "http://git.fragal.eu", 1));
-    assert(checkLevel(".*.*.fragal.eu", "http://a.b.fragal.eu", 1));
+    assert(checkLevel("http://fragal.eu/", "http://fragal.eu", 1, false));
+    assert(checkLevel("http://fragal.eu/", "http://fragal.eu/a/b/c", 3, false));
+    assert(!checkLevel("http://fragal.eu/", "http://fragal.eu/a/b/c", 1, false));
+    assert(checkLevel("http://fragal.eu", "http://fragal.eu/", 1, false));
+    assert(checkLevel("fragal.eu", "http://fragal.eu/", 1, false));
+    assert(checkLevel("fragal.eu", "https://fragal.eu/", 1, false));
+    assert(checkLevel("http://fragal.eu", "http://fragal.eu", 1, false));
+    assert(checkLevel("fragal.eu", "http://fragal.eu/", 1, false));
+    assert(checkLevel("http://.*.eu", "fragal.eu", 1, true));
+    assert(checkLevel("http://.*", "fragal.eu", 1, true));
+    assert(!checkLevel("http://.*/", "fragal.eu/git", 0, true));
+    assert(!checkLevel("http://.*.fragal.eu/", "http://fragal.eu/git", 0, true));
+    assert(!checkLevel("http://.*.eu", "fragal.eu/git", 0, true));
+    assert(checkLevel("http://.*.eu", "fragal.eu/git", 1, true));
+    assert(checkLevel("http://.*.fragal.eu", "http://git.fragal.eu", 1, true));
+    assert(checkLevel(".*.fragal.eu", "http://git.fragal.eu", 1, true));
+    assert(checkLevel(".*.*.fragal.eu", "http://a.b.fragal.eu", 1, true));
 
-    assert(checkLevel("http://fragal.eu:80/", "http://fragal.eu:80", 1));
-    assert(!checkLevel("http://fragal.eu:80/", "http://fragal.eu:80/a/b/c", 1));
-    assert(checkLevel("http://fragal.eu:80", "http://fragal.eu:80/", 1));
-    assert(checkLevel("fragal.eu:80", "http://fragal.eu:80/", 1));
-    assert(checkLevel("http://.*.eu:80", "fragal.eu:80", 1));
-    assert(checkLevel("http://.*", "fragal.eu:80", 1));
-    assert(!checkLevel("http://.*/", "fragal.eu:80/git", 0));
-    assert(!checkLevel("http://.*.fragal.eu:80/", "http://fragal.eu:80/git", 0));
-    assert(!checkLevel("http://.*.eu:80", "fragal.eu:80/git", 0));
-    assert(checkLevel("http://.*.eu:80", "fragal.eu:80/git", 1));
-    assert(checkLevel(".*.fragal.eu:80", "http://git.fragal.eu:80", 1));
+    assert(checkLevel("http://fragal.eu:80/", "http://fragal.eu:80", 1, false));
+    assert(!checkLevel("http://fragal.eu:80/", "http://fragal.eu:80/a/b/c", 1, false));
+    assert(checkLevel("http://fragal.eu:80", "http://fragal.eu:80/", 1, false));
+    assert(checkLevel("fragal.eu:80", "http://fragal.eu:80/", 1, false));
+    assert(checkLevel("http://.*.eu:80", "fragal.eu:80", 1, true));
+    assert(checkLevel("http://.*", "fragal.eu:80", 1, true));
+    assert(!checkLevel("http://.*/", "fragal.eu:80/git", 0, true));
+    assert(!checkLevel("http://.*.fragal.eu:80/", "http://fragal.eu:80/git", 0, true));
+    assert(!checkLevel("http://.*.eu:80", "fragal.eu:80/git", 0, true));
+    assert(checkLevel("http://.*.eu:80", "fragal.eu:80/git", 1, true));
+    assert(checkLevel(".*.fragal.eu:80", "http://git.fragal.eu:80", 1, true));
+}
+
+/**
+ * O(n) find the rule that matches the url given,
+ * does not check if the rule is respected
+ */
+URLRule findRule(const URL src, URLRule[] rules) @safe
+{
+    import std.algorithm.iteration : filter;
+    import std.range : takeOne;
+    return rules.filter!(rule => rule.matches(src)).takeOne.front;
+}
+
+/// ditto
+URLRule findRule(const string src, URLRule[] rules) @safe
+{
+    return findRule(src.parseURL, rules);
+}
+
+unittest{
+    URLRule[] rules;
+    rules ~= URLRule("fragal.eu", 2, false);
+    rules ~= URLRule("https://.*.fragal.eu", 1, true);
+    rules ~= URLRule(".*.fragal.eu", 0, true);
+    rules ~= URLRule(".*", 0, true);
+    assert(findRule("http://fragal.eu/a/b", rules) == rules[0]);
+    assert(findRule("https://fragal.eu/a/b", rules) == rules[0]);
+    assert(findRule("http://a.fragal.eu/a/b", rules) == rules[2]);
+    assert(findRule("https://a.fragal.eu/a/b", rules) == rules[1]);
+    assert(findRule("https://francescomecca.eu", rules) == rules[$-1]);
+}
+
+bool couldRecur(const string url, const int lev)
+{
+    auto u = url.parseURL;
+    auto rule = findRule(u, config.rules);
+    return checkLevel(rule, u, lev);
 }

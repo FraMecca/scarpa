@@ -2,6 +2,7 @@ module database;
 
 import events;
 import logger;
+import config : config;
 
 import d2sqlite3;
 import sumtype;
@@ -13,6 +14,10 @@ import std.uuid;
 
 auto createDB(const string location) @trusted
 {
+    debug{
+        import std.file;
+        if(exists(config.projdir ~ "scarpa.db")) remove(config.projdir ~ "scarpa.db");
+    }
     auto db = Database(location);
 
     // TODO text length for uuid
