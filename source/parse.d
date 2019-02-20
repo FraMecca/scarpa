@@ -70,46 +70,57 @@ unittest{
     // assert(p == parseResult("http://example.com/about", "../example.com/about"), p.to!string);
 }
 
+auto segments = (inout string s) => s.split('/').filter!(i => i != "");
 /**
  * Converts an URL to a path on the disk
+ * relatively to the source that points to the URL
  */
-string toFileName(const string url, const string absRooturl = "", const bool addIndex = true) @safe
+string toFileName(const URL url, const URL src) @safe
 in{
-    import std.algorithm.searching : canFind;
-    assert(!url.canFind('#'), url);
+    assert(url.fragment == "",  url);
 }do
 {
-	string rooturl, dst;
-	if(!absRooturl.empty) {
-		rooturl = absRooturl.toFileName("", false);
-		if(!rooturl.endsWith("/")) rooturl ~= "/";
-	}
+    import std.range : walkLength, zip, repeat, take, tee;
+    import std.array : array, join;
+    import std.algorithm.iteration : map;
+    import std.algorithm.searching : countUntil;
 
-	if(addIndex) {
-		dst = url.cond!(
-			u => u.count("/") == 2, u => u ~ "/index.html",
-			u => u.endsWith("/"), u => u ~ "index.html",
-			d => d
-		);
-	} else {
-		dst = url;
-	}
+    bool sameHost = url.host == src.host;
+    immutable srcments = src.path.segments.array;
+    immutable dstments = url.path.segments.array;
 
-	dst = dst.cond!(
-		  u => u.startsWith("http://"), u => u.stripLeft("http://"),
-		  u => u.startsWith("https://"), u => u.stripLeft("https://"),
-		  u => u.startsWith("/"), u => rooturl ~ u.stripLeft("/"),
-		  u => u
-	);
+    long len = sameHost ?
+        zip(dstments, srcments)
+        .map!(t => t[0] == t[1])
+        .countUntil(false) :
+        // else
+        srcments.walkLength + 1;
 
-	// TODO add ../ for correct parsing by browsers
+    len = len == -1 ? 0 : len;
+    immutable splitLen = sameHost ? len : 0;
+    if(sameHost && srcments.length != 0)
+        len = dstments.length - len ;// now adjust to remove same subfolders
 
-	return dst;
+    immutable goUp = "../".repeat.take(len).join;
+
+    return goUp ~
+        (sameHost ? "" : url.host ~ "/") ~
+        dstments[splitLen..$].join("/");
+}
+
+///ditto
+string toFileName(const string url, const string src, const bool addIndex = true) @safe
+{
+    return toFileName(url.parseURL, src.parseURL);
 }
 
 unittest{
-	assert("https://fragal.eu/".toFileName == "fragal.eu/index.html");
-	assert("https://fragal.eu".toFileName == "fragal.eu/index.html");
+	assert(toFileName("https://fragal.eu/a.html", "https://fragal.eu/") == "a.html");
+	assert(toFileName("https://fragal.eu/a/b.html", "https://fragal.eu/") == "a/b.html");
+	assert(toFileName("https://fragal.eu/b.html", "https://fragal.eu/a") == "../b.html");
+	assert(toFileName("https://fragal.eu/a/c/", "https://fragal.eu/a/b/") == "../c");
+	assert(toFileName("https://fragal.eu/c/d/", "https://fragal.eu/a/b/") == "../../c/d");
+	assert(toFileName("https://francescomecca.eu/A/c.html", "https://fragal.eu/a/b/") == "../../../francescomecca.eu/A/c.html");
 }
 
 /**
@@ -190,7 +201,7 @@ struct URLRule{
         url = ur.parseURL;
         level = lev;
         rgx = regex(url.host);
-        segment = url.path.split('/').filter!(i => i != "").array;
+        segment = url.path.segments.array;
         length = segment.length;
         isRegex = isRgx;
         ur.cond!(
