@@ -50,13 +50,13 @@ void insertEvent(ref Database db, Event e) @trusted
         VALUES (:type, :resolved, :uuid, :parent, :data)"
     );
 	statement.bind(":type", e.match!(
-          (RequestEvent _ev) => EventType.RequestEvent,
-          (HTMLEvent _ev) => EventType.HTMLEvent,
+          (inout RequestEvent _ev) => EventType.RequestEvent,
+          (inout HTMLEvent _ev) => EventType.HTMLEvent,
           (inout ToFileEvent _ev) => EventType.ToFileEvent,
     ));
 	statement.bind(":resolved", e.match!(
-          (RequestEvent _ev) => false,
-          (HTMLEvent _ev) => true,
+          (inout RequestEvent _ev) => false,
+          (inout HTMLEvent _ev) => true,
           (const ToFileEvent _ev) => true,
     ));
 	statement.bind(":uuid", uuid);
@@ -88,8 +88,8 @@ void insertEvent(ref Database db, Event e) @trusted
     }
 
 	e.match!(
-             (RequestEvent _ev) {},
-             (HTMLEvent _ev) {},
+             (inout RequestEvent _ev) {},
+             (inout HTMLEvent _ev) {},
              (inout ToFileEvent _ev) { updateGrandParent(db, e.parent); },
     );
 }

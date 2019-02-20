@@ -43,12 +43,12 @@ struct _Event{
     const JSONValue toJson() @safe
     {
         return ev.match!(
-            (RequestEvent _ev) {
+            (inout RequestEvent _ev) {
                 auto j = JSONValue();
                 j["url"] = _ev.m_url.toString;
                 j["level"] = _ev.m_level;
                 return j;},
-            (HTMLEvent _ev) {
+            (inout HTMLEvent _ev) {
                 auto j = JSONValue();
                 j["url"] = _ev.m_rooturl.toString;
                 j["level"] = _ev.m_level;
@@ -84,9 +84,9 @@ struct _Event{
 		log(this.toString);
 		try {
 			return typeof(return).expected(ev.match!(
-					(RequestEvent _ev) => _ev.resolve(),
-					(HTMLEvent _ev) => _ev.resolve(),
-					(const ToFileEvent _ev) => _ev.resolve()));
+					(inout RequestEvent _ev) => _ev.resolve(),
+					(inout HTMLEvent _ev) => _ev.resolve(),
+					(inout ToFileEvent _ev) => _ev.resolve()));
 		} catch (Exception e) {
             debug{
                 warning(e.info);
@@ -116,7 +116,7 @@ template makeEvent(alias t)
 
 auto firstEvent(string rootUrl)
 {
-    auto r = RequestEvent(rootUrl);
+    auto r = RequestEvent(rootUrl.parseURL, 0);
 	Event req = makeEvent!(r);
     return req;
 }
@@ -148,23 +148,25 @@ struct Base {
 
 struct RequestEvent {
 
-	private string m_url;
+	private immutable URL m_url;
+    int m_level;
     Base base;
     alias base this;
 
-	this(const string url, const ID parent = ID()) @safe
+	this(const URL url, int lev, const ID parent = ID()) @safe
 	{
-        base = Base(parent, md5UUID(url));
-		m_url = url;
+        base = Base(parent, md5UUID(url.toString));
+		m_url = URL(url);
+        m_level = lev;
 	}
 
 	const EventRange resolve() @safe
 	{
 		EventRange res;
 
-		requestUrl(m_url).match!(
-			(ReceiveAsRange stream) => res.append(ToFileEvent(stream, m_url, this.uuid)),
-			(string raw) => res.append(HTMLEvent(raw, m_url, this.uuid))
+		requestUrl(m_url.toString).match!(
+            (ReceiveAsRange stream) => res.append(ToFileEvent(stream, m_url, m_level, this.uuid)),
+			(string raw) => res.append(HTMLEvent(raw, m_url, m_level, this.uuid))
 			);
 
 		assert(res.length == 1);
@@ -180,15 +182,16 @@ struct RequestEvent {
 struct HTMLEvent {
 
 	private string m_content;
-	private string m_rooturl;
+	private immutable URL m_rooturl;
+    int m_level;
     Base base;
     alias base this;
 
-	this(const string content, const string root, const UUID parent) @safe
+	this(const string content, const URL root, int lev, const UUID parent) @safe
 	{
         base = Base(parent, md5UUID(root ~ content));
 		m_content = content;
-        m_rooturl = root; // the url of the page requested
+        m_rooturl = URL(root); // the url of the page requested
 	}
 
 	const EventRange resolve() @trusted// TODO safe 
@@ -203,7 +206,7 @@ struct HTMLEvent {
 		// TODO other tags and js and css
         foreach(ref node; tree.byTagName("a")){
             if(!node["href"].isNull && node["href"].get.isValidHref){
-                auto tup = parseUrl(node["href"].get(), m_rooturl);
+                auto tup = url_and_path(node["href"].get(), m_rooturl);
                 if(couldRecur(tup.url, m_level + 1))
                     res.append(RequestEvent(tup.url, m_level + 1, this.parent));
                 node["href"] = tup.fname; // replace with a filename on disk
@@ -223,24 +226,27 @@ struct HTMLEvent {
 struct ToFileEvent
 {
 	private SumType!(ReceiveAsRange, string) m_content;
-    private string m_rooturl;
+    private immutable URL m_rooturl;
     private string m_fname;
+    private int m_level;
     Base base;
     alias base this;
 
-	this(ReceiveAsRange content, const string url, const ID parent) @safe
+	this(ReceiveAsRange content, const URL url, int level, const ID parent) @safe
 	{
 		m_content = content;
-        m_rooturl = url;
-		m_fname = config.projdir ~ url.toFileName;
+        m_rooturl = URL(url);
+        m_level = level;
+		m_fname = config.projdir ~ url.host ~ url.path;
         base = Base(parent, md5UUID(m_rooturl));
 	}
 
-	this(string content, const string url, const ID parent) @safe
+	this(string content, const URL url, int level, const ID parent) @safe
     {
             m_content = content;
-            m_rooturl = url;
-            m_fname = config.projdir ~ url.toFileName;
+            m_level = level;
+            m_rooturl = URL(url);
+            m_fname = config.projdir ~ url.host ~ url.path;
             base = Base(parent, md5UUID(m_fname));
         }
 

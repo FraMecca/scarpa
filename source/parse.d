@@ -27,25 +27,33 @@ import std.array : split;
 alias ParseResult = Tuple!(URL, "url", string, "fname");
 alias parseResult = tuple!("url", "fname");
 
-ParseResult parseUrl(const string url, const string absRooturl) @safe
+ParseResult url_and_path(const string url, const URL absRooturl) @safe
 in{
-    assert(absRooturl.startsWith("http://") || absRooturl.startsWith("https://"), absRooturl);
+    // assert(absRooturl.startsWith("http://") || absRooturl.startsWith("https://"), absRooturl);
     assert(url.startsWith("http://") || url.startsWith("https://") || url.startsWith("/"), url);
 }
 do{
-	string rooturl = absRooturl.toFileName("", false);
-    assert(rooturl);
-    string src, dst;
-    // write full path in case of isRelative urls
-	src = url.cond!(
-		  u => u.startsWith("/"), u => absRooturl.cond!(
-				a => a.endsWith("/"), a => a[0..$-1] ~ u,
-				a => a ~ u), // stripped trailing /
-	      u => u
-	).removeAnchor;
+	// string rooturl = absRooturl.toFileName("", false);
+    string dst;
+    URL src;
+    // write full path in case of relative urls
+    if(url.startsWith("/")){
+        src = URL(absRooturl);
+        src.path = url.removeAnchor;
+    } else {
+        src = url.parseURL;
+        src.fragment = "";
+    }
 
-    // write filename on disk
-	dst = toFileName(url.removeAnchor, rooturl, false);
+	// src = url.cond!(
+	// 	  u => u.startsWith("/"), u => absRooturl.cond!(
+	// 			a => a.endsWith("/"), a => a[0..$-1] ~ u,
+	// 			a => a ~ u), // stripped trailing /
+	//       u => u
+	// ).removeAnchor;
+
+    // write filename on disk sued on href=...
+	dst = toFileName(src, absRooturl, false);
     return parseResult(src, dst);
 }
 

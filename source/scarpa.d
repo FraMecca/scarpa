@@ -1,5 +1,9 @@
 module scarpa;
 
+debug {
+    public import std.stdio : writeln;
+}
+
 import parse;
 import io;
 import database;
