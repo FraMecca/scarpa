@@ -113,6 +113,7 @@ struct Storage {
 	{
 		if(toSkip(ev)) return;
 		queue.put(ev);
+        warning("PUT: Element in queue: ", queue.length);
 	}
 
 	void fire(Event ev) @trusted
@@ -131,6 +132,7 @@ struct Storage {
 
 		auto task = async(&go);
 		tasks[uuid] = task;
+        warning("FIRE: Element in queue: ", queue.length);
 	}
 }
 

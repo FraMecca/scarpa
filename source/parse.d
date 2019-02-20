@@ -7,6 +7,7 @@ import logger;
 import url;
 
 import ddash.functional : cond;
+import sumtype;
 
 import std.typecons : Tuple, tuple;
 import std.algorithm.searching : startsWith, endsWith;
@@ -68,7 +69,7 @@ in{
         return "index.html";
 
     bool sameHost = url.host == src.host;
-    immutable srcments = src.path.segments.array;
+    immutable srcments = src.path.segments.array; // Could store this in URL struct
     immutable dstments = url.path.segments.array;
 
     long len = sameHost ?
@@ -222,9 +223,6 @@ struct URLRule{
             u => u.startsWith("https://"), { isRelative = false; },
             { isRelative = true; }
         );
-        // debug{
-        //     writeln("Rule: ", ur, " isRegex: ", isRegex, " isRelative: ", isRelative);
-        // }
     }
 
     bool matches(const URL url) @safe
@@ -321,9 +319,20 @@ unittest{
     assert(findRule("https://francescomecca.eu", rules) == rules[$-1]);
 }
 
-bool couldRecur(const string url, const int lev)
+struct DoNotRecur {};
+alias RuleLevel = SumType!(int, DoNotRecur); /// Possible return values for couldRecur
+/**
+ * compare an url against the rule specified for it
+ * and return the level of recursion if it passes
+ * Levels start from 0
+ * but on config file they are specified starting from 1
+ */
+RuleLevel couldRecur(const URL url, const int lev, URLRule current)
 {
-    auto u = url.parseURL;
-    auto rule = findRule(u, config.rules);
-    return checkLevel(rule, u, lev);
+    RuleLevel ret;
+    auto rule = findRule(url, config.rules);
+    int level = rule == current ? lev + 1 : 1;
+    warning(url, " -- ", current.toString, ":", rule.toString, "=", lev,":",level);
+    warning(rule == current ? "true": "false" );
+    return checkLevel(rule, url, level) ? RuleLevel(level) : RuleLevel(DoNotRecur());
 }

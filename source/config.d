@@ -29,20 +29,6 @@ struct Config {
 
 __gshared Config _config;
 
-// void dumpConfig() @trusted
-// {
-// 	auto root = new Tag();
-
-// 	static foreach(f; __traits(allMembers, Config)) {
-// 		mixin("root.add(
-// 					new Tag(null, \""~f~"\", [Value(_config."~f~")])
-// 					);");
-// 	}
-
-// 	auto fp = File(_config.projdir ~ CONFIG_FILE, mode!"w");
-// 	fp.write(root.toSDLDocument().representation);
-// }
-
 Config loadConfig(const string path, Config c) @trusted
 {
 	auto fp = File(path, mode!"r");

@@ -13,7 +13,7 @@ import requests;
 
 import std.stdio : writeln;
 import std.conv : to;
-import std.typecons : Nullable;
+import std.typecons : Nullable, No;
 import std.uuid;
 import std.json;
 import std.meta;
@@ -175,7 +175,9 @@ struct RequestEvent {
 
 	@property const string toString() @safe
 	{
-		return "RequestEvent(basedir: " ~ config.projdir ~ ", url: " ~ m_url ~ ")";
+        import std.conv : to;
+		return "RequestEvent(basedir: " ~ config.projdir ~ ", url: " ~ m_url ~
+            " level: "~ m_level.to!string ~ ")";
 	}
 }
 
@@ -192,6 +194,7 @@ struct HTMLEvent {
         base = Base(parent, md5UUID(root ~ content));
 		m_content = content;
 		m_rooturl = root.parseURL;
+        m_level = lev;
 	}
 
 	const EventRange resolve() @trusted// TODO safe 
@@ -203,12 +206,19 @@ struct HTMLEvent {
         auto arrogante = Arrogant();
    		auto tree = arrogante.parse(m_content);
 
+        URLRule currentRule = findRule(m_rooturl, config.rules); // TODO pass instead of recomputing
+
 		// TODO other tags and js and css
         foreach(ref node; tree.byTagName("a")){
             if(!node["href"].isNull && node["href"].get.isValidHref){
                 auto tup = url_and_path(node["href"].get(), m_rooturl);
-                if(couldRecur(tup.url, m_level + 1))
-                    res.append(RequestEvent(tup.url, m_level + 1, this.parent));
+
+                auto level = couldRecur(tup.url, m_level, currentRule);
+                level.match!(
+                    (int l) { res.append(RequestEvent(tup.url, l, this.parent)); },
+                    (No) {}
+                );
+
                 node["href"] = tup.fname; // replace with a filename on disk
             }
         }
