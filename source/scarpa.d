@@ -58,6 +58,13 @@ struct BinnedPQ {
 				(inout ToFileEvent e) => bins[EventType.ToFileEvent] ~= makeEvent!e
 				);
 	}
+
+    @property ulong length() @safe
+    {
+        ulong a;
+        foreach(b; bins) a += b.length;
+        return a;
+    }
 }
 
 // TODO handle update / existing files in the projdirectory before starting the program

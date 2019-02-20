@@ -3,6 +3,7 @@ module parse;
 import scarpa;
 import config : config;
 import io;
+import logger;
 import url;
 
 import ddash.functional : cond;
@@ -29,45 +30,22 @@ alias parseResult = tuple!("url", "fname");
 
 ParseResult url_and_path(const string url, const URL absRooturl) @safe
 in{
-    // assert(absRooturl.startsWith("http://") || absRooturl.startsWith("https://"), absRooturl);
     assert(url.startsWith("http://") || url.startsWith("https://") || url.startsWith("/"), url);
+    assert(absRooturl.fragment == "");
 }
 do{
-	// string rooturl = absRooturl.toFileName("", false);
     string dst;
     URL src;
     // write full path in case of relative urls
     if(url.startsWith("/")){
-        src = URL(absRooturl);
+        src = absRooturl.parseURL;
         src.path = url.removeAnchor;
     } else {
-        src = url.parseURL;
-        src.fragment = "";
+        src = url.removeAnchor.parseURL;
     }
 
-	// src = url.cond!(
-	// 	  u => u.startsWith("/"), u => absRooturl.cond!(
-	// 			a => a.endsWith("/"), a => a[0..$-1] ~ u,
-	// 			a => a ~ u), // stripped trailing /
-	//       u => u
-	// ).removeAnchor;
-
-    // write filename on disk sued on href=...
 	dst = toFileName(src, absRooturl, false);
     return parseResult(src, dst);
-}
-
-unittest{
-    // TODO write tests for correct path
-	// import std.conv : to;
-    // auto p = parseUrl("/about", "http://fragal.eu/");
-    // assert(p == parseResult("http://fragal.eu/about", "../fragal.eu/about"), p.to!string);
-
-    // p = parseUrl("http://example.com", "http://fragal.eu/");
-    // assert(p == parseResult("http://example.com", "../example.com"), p.to!string);
-
-    // p = parseUrl("http://example.com/about", "http://fragal.eu/");
-    // assert(p == parseResult("http://example.com/about", "../example.com/about"), p.to!string);
 }
 
 auto segments = (inout string s) => s.split('/').filter!(i => i != "");
@@ -85,6 +63,10 @@ in{
     import std.algorithm.iteration : map;
     import std.algorithm.searching : countUntil;
 
+    // is it the root of the website?
+    if(url.path == "/" || url.path.empty)
+        return "index.html";
+
     bool sameHost = url.host == src.host;
     immutable srcments = src.path.segments.array;
     immutable dstments = url.path.segments.array;
@@ -99,13 +81,14 @@ in{
     len = len == -1 ? 0 : len;
     immutable splitLen = sameHost ? len : 0;
     if(sameHost && srcments.length != 0)
-        len = dstments.length - len ;// now adjust to remove same subfolders
+        len = dstments.length - len; // now adjust to remove same subfolders
 
     immutable goUp = "../".repeat.take(len).join;
 
-    return goUp ~
-        (sameHost ? "" : url.host ~ "/") ~
-        dstments[splitLen..$].join("/");
+    return goUp ~ // file system hierarchy
+        (sameHost ? "" : url.host ~ "/") ~ // host
+        dstments[splitLen..$].join("/") ~ // path
+        (url.path.endsWith("/") ? "/index.html" : ""); // index.html if it is a folder
 }
 
 ///ditto
@@ -118,9 +101,39 @@ unittest{
 	assert(toFileName("https://fragal.eu/a.html", "https://fragal.eu/") == "a.html");
 	assert(toFileName("https://fragal.eu/a/b.html", "https://fragal.eu/") == "a/b.html");
 	assert(toFileName("https://fragal.eu/b.html", "https://fragal.eu/a") == "../b.html");
-	assert(toFileName("https://fragal.eu/a/c/", "https://fragal.eu/a/b/") == "../c");
-	assert(toFileName("https://fragal.eu/c/d/", "https://fragal.eu/a/b/") == "../../c/d");
+	assert(toFileName("https://fragal.eu/a/c/", "https://fragal.eu/a/b/") == "../c/index.html");
+	assert(toFileName("https://fragal.eu/a/c", "https://fragal.eu/a/b/") == "../c");
+	assert(toFileName("https://fragal.eu/c/d/", "https://fragal.eu/a/b/") == "../../c/d/index.html");
 	assert(toFileName("https://francescomecca.eu/A/c.html", "https://fragal.eu/a/b/") == "../../../francescomecca.eu/A/c.html");
+	assert(toFileName("https://fragal.eu/", "https://fragal.eu/") == "index.html");
+	assert(toFileName("https://fragal.eu", "https://fragal.eu/") == "index.html");
+}
+
+/**
+ * absolute path of a file that need to be written
+ * supposing the project directory as root
+ * The return does not contain the project directory.
+ */
+string asPathOnDisk(const URL url) @safe
+{
+    // is it the root of the website?
+    if(url.path == "/" || url.path.empty)
+        return url.host ~ "/index.html";
+
+    return url.host ~ url.path ~ (url.path.endsWith("/") ? "index.html" : "");
+}
+
+/// ditto
+string asPathOnDisk(const string url) { return url.parseURL.asPathOnDisk; }
+
+unittest{
+    assert("http://fragal.eu".asPathOnDisk == "fragal.eu/index.html");
+    assert("http://fragal.eu/".asPathOnDisk == "fragal.eu/index.html");
+    assert("http://fragal.eu/index.html".asPathOnDisk == "fragal.eu/index.html");
+    assert("http://fragal.eu/a.html".asPathOnDisk == "fragal.eu/a.html");
+    assert("http://fragal.eu/a/b.html".asPathOnDisk == "fragal.eu/a/b.html");
+    assert("http://fragal.eu/a/b".asPathOnDisk == "fragal.eu/a/b");
+    assert("http://fragal.eu/a/b/".asPathOnDisk == "fragal.eu/a/b/index.html");
 }
 
 /**
