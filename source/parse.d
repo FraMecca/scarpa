@@ -331,8 +331,8 @@ RuleLevel couldRecur(const URL url, const int lev, URLRule current)
 {
     RuleLevel ret;
     auto rule = findRule(url, config.rules);
-    int level = rule == current ? lev + 1 : 1;
-    warning(url, " -- ", current.toString, ":", rule.toString, "=", lev,":",level);
-    warning(rule == current ? "true": "false" );
+    int level = rule == current ? lev : 1;
+    // warning(url, " -- ", current.toString, ":", rule.toString, "=", lev,":",level);
+    // warning(rule == current ? "true": "false" );
     return checkLevel(rule, url, level) ? RuleLevel(level) : RuleLevel(DoNotRecur());
 }
