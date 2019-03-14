@@ -19,7 +19,6 @@ struct Config {
 	long maxResSize = 8 * 1024 * 1024; // limits the size of the stream parsed in memory
 	bool checkFileAfterSave = true; // after a file is saved, check if it is HTML and parse it again
     string projdir; // considered project name
-    string mainDomain;
     string rootUrl;
     string log = "scarpa.error.log";
     URLRule[] rules;
@@ -31,6 +30,9 @@ __gshared Config _config;
 
 Config loadConfig(const string path, Config c) @trusted
 {
+    import std.algorithm.iteration : filter;
+    import std.algorithm.searching : canFind;
+
 	auto fp = File(path, mode!"r");
 	auto dst = appender!string;
 	ubyte[64] buf;
@@ -43,14 +45,11 @@ Config loadConfig(const string path, Config c) @trusted
 
 	auto root = parseSource(dst.data);
 
-	static foreach(f; __traits(allMembers, Config)) {
-        static if(f != "rules"){
-          mixin("c."~f~" = root.expectTagValue!(typeof(_config."~f~"))
-                  (\""~f~"\");");
-        }
-	}
-    import std.algorithm.iteration : filter;
-    import std.algorithm.searching : canFind;
+	c.maxResSize = root.getTagValue!long("maxResSize", 8 * 1024 * 1024);
+	c.checkFileAfterSave = root.getTagValue!bool("checkFileAfterSave", true);
+	c.log = root.getTagValue!string("log", "scarpa.error.log");
+
+	c.rootUrl = root.expectTagValue!string("rootUrl");
 
     auto globalRule = URLRule(".*", 0, true);
     foreach(val ; root.tags().filter!(s => s.getFullName.name == "rule")){
@@ -74,11 +73,16 @@ Config config() @trusted
 }
 
 enum CLIResult {
-	NEW_PROJECT = 0,
-	RESUME_PROJECT = 1,
-	HELP_WANTED = 2,
-	NO_ARGS = 3,
-    ERROR = 4
+	NEW_PROJECT,
+	RESUME_PROJECT,
+	EXAMPLE_CONF,
+	HELP_WANTED,
+	NO_ARGS,
+    ERROR
+}
+
+void dumpExampleConfig()
+{
 }
 
 CLIResult parseCli(string[] args)
@@ -104,7 +108,7 @@ CLIResult parseCli(string[] args)
         // "check-after-save", "check if a file can be parsed after save", &c.checkFileAfterSave,
         // "log", "location of the log file", &c.log,
         // "max-mem-size",  "limit maximum size of files parsed in memory", &c.maxResSize,
-		"resume", "resume a project\nif project directory is not specified, pwd is used", &resume
+		"resume", "resume a project; if project directory is not specified, pwd is used", &resume
         );
     // TODO implement priority of cli with respect to conf file
 
@@ -130,8 +134,8 @@ CLIResult parseCli(string[] args)
 			c.projdir = c.projdir.asAbsolutePath.array;
 		if(!c.projdir.endsWith("/"))
 			c.projdir ~= "/";
-		if(c.mainDomain == "")
-			c.mainDomain = c.rootUrl;
+		// if(c.mainDomain == "") // TODO remove
+		// 	c.mainDomain = c.rootUrl;
 
 		res = CLIResult.NEW_PROJECT;
 	}
