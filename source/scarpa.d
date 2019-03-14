@@ -9,7 +9,7 @@ import io;
 import database;
 import events;
 import logger;
-import config : config, parseCli, CLIResult;
+import config : config, parseCli, CLIResult, dumpExampleConfig;
 
 import vibe.core.concurrency;
 import vibe.core.task;
@@ -111,9 +111,8 @@ struct Storage {
 
 	void put(Event ev) @safe
 	{
-		if(toSkip(ev)) return;
+		if(toSkip(ev))  return;
 		queue.put(ev);
-        warning("PUT: Element in queue: ", queue.length);
 	}
 
 	void fire(Event ev) @trusted
@@ -121,7 +120,7 @@ struct Storage {
 		assert(!toSkip(ev));
 
 		db.insertEvent(ev);
-		auto uuid = ev.uuid.get.toString;
+		immutable uuid = ev.uuid.get.toString;
 
 		auto go() {
 			auto results = ev.resolve;
@@ -132,7 +131,6 @@ struct Storage {
 
 		auto task = async(&go);
 		tasks[uuid] = task;
-        warning("FIRE: Element in queue: ", queue.length);
 	}
 }
 
@@ -152,6 +150,7 @@ int main(string[] args)
 	parseCli(args).cond!(
 		CLIResult.HELP_WANTED, { exit = true; },
 		CLIResult.ERROR, { exit = true; },
+		CLIResult.EXAMPLE_CONF, { dumpExampleConfig(); exit = true; },
 		CLIResult.NEW_PROJECT, {
             // makeDirRecursive(config.projdir);
             // dumpConfig();
@@ -169,25 +168,29 @@ int main(string[] args)
     auto first = firstEvent(config.rootUrl);
 	auto storage = Storage(config.projdir ~ "/scarpa.db", first, thisTid);
 
-	const uint NEVENTS = 20; // TODO remove, debug purpose
+	const uint NEVENTS = 5; // TODO remove, debug purpose
     while(true){
 		uint cnt_event;
 		storage
-			.take(NEVENTS-cnt_event)
+			.take(NEVENTS)
 			.filter!((Event e) => !storage.toSkip(e))
 			.each!((Event e) => storage.fire(e));
-		cnt_event = NEVENTS-cnt_event;
 
         // receive result (from first available)
-        auto uuid = receiveOnly!string;
+		if(storage.tasks.empty && storage.queue.empty) break;
+
+		auto uuid = receiveOnly!string;
 		cnt_event--;
 		storage.tasks[uuid]
 			.getResult()
 			.match!(
-				(EventRange r) {
-                    r.each!(e => storage.put(e)); // enqueue
-				},
-				(Unexpected!string s) => logException(s)
-			);
-    }
+					(EventRange r) {
+						r.each!(e => storage.put(e)); // enqueue
+					},
+					(Unexpected!string s) => logException(s)
+					);
+		storage.tasks.remove(uuid);
+	}
+
+	return 0;
 }
