@@ -155,7 +155,7 @@ struct RequestEvent {
 
 	this(inout URL url, int lev, const ID parent = ID()) @safe
 	{
-        base = Base(parent, md5UUID(url.toString));
+        base = Base(parent, md5UUID(url.toString ~ "REQUEST"));
 		m_url = url.parseURL;
         m_level = lev;
 	}
@@ -191,7 +191,7 @@ struct HTMLEvent {
 
 	this(const string content, const URL root, int lev, const UUID parent) @safe
 	{
-        base = Base(parent, md5UUID(root ~ content));
+        base = Base(parent, md5UUID(root /*~ content*/ ~ "HTML"));
 		m_content = content;
 		m_rooturl = root.parseURL;
         m_level = lev;
@@ -248,7 +248,7 @@ struct ToFileEvent
         m_rooturl = url.parseURL;
         m_level = level;
 		m_fname = config.projdir ~ url.asPathOnDisk;
-        base = Base(parent, md5UUID(m_rooturl));
+        base = Base(parent, md5UUID(m_rooturl ~ "FILE"));
 	}
 
 	this(string content, const URL url, int level, const ID parent) @safe
@@ -257,7 +257,7 @@ struct ToFileEvent
             m_level = level;
             m_rooturl = url.parseURL;
             m_fname = config.projdir ~ url.asPathOnDisk;
-            base = Base(parent, md5UUID(m_fname));
+            base = Base(parent, md5UUID(m_fname ~ "FILE"));
         }
 
 	const EventRange resolve() @trusted
