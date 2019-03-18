@@ -20,12 +20,12 @@ auto createDB(const string location) @trusted
     }
     auto db = Database(location);
 
-    // TODO text length for uuid
+	enum uuidlen = md5UUID("ct").data.length;
     auto table =
         r"create table Event (
            type integer,
 		   resolved integer not null,
-           uuid text not null unique,
+           uuid varchar(" ~ uuidlen ~") not null unique,
            parent text,
            data text not null
           )";
