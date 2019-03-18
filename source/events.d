@@ -10,6 +10,7 @@ import sumtype;
 import ddash.functional : cond;
 import ddash.utils : Expect;
 import requests;
+import vibe.core.file : FileStream;
 
 import std.stdio : writeln;
 import std.conv : to;
@@ -106,6 +107,9 @@ struct _Event{
 
 alias Event = immutable(_Event);
 
+/**
+ * Construct an immutable Event
+ */
 template makeEvent(alias t)
 {
     auto makeEvent() {
@@ -114,6 +118,9 @@ template makeEvent(alias t)
     }
 }
 
+/**
+ * Construct an immutable event from the root url used for scraping
+ */
 auto firstEvent(string rootUrl)
 {
     auto r = RequestEvent(rootUrl.parseURL, 0);
@@ -129,6 +136,11 @@ private void append(E)(ref EventRange res, E e) @safe
 	res ~= ee;
 }
 
+/**
+ * Every event contains a base tuple (parent, uuid)
+ * Parent is used to go back the event chain until the last succesful event.
+ * The uuid is a unique identifier construct from (url + type(event)).
+ */
 struct Base {
 	ID parent;
 	ID uuid;
@@ -148,11 +160,12 @@ struct Base {
 
 struct RequestEvent {
 
-	private immutable URL m_url;
-    int m_level;
-    Base base;
+	immutable URL m_url;
+    const int m_level;
+    const Base base;
     alias base this;
 
+	///
 	this(inout URL url, int lev, const ID parent = ID()) @safe
 	{
         base = Base(parent, md5UUID(url.toString ~ "REQUEST"));
@@ -160,19 +173,25 @@ struct RequestEvent {
         m_level = lev;
 	}
 
+	/**
+	 * Asynchronously gets the content from the URL:
+	 * HTML strings are saved in memory while files are saved as temporary files.
+	 * Always generate an EventRange of length one.
+	 */
 	const EventRange resolve() @safe
 	{
 		EventRange res;
 
 		requestUrl(m_url.toString).match!(
-            (ReceiveAsRange stream) => res.append(ToFileEvent(stream, m_url, m_level, this.uuid)),
-			(string raw) => res.append(HTMLEvent(raw, m_url, m_level, this.uuid))
+            (const FilePayload stream) => res.append(ToFileEvent(stream, m_url, m_level, this.uuid)),
+			(const HTMLPayload raw) => res.append(HTMLEvent(raw, m_url, m_level, this.uuid))
 			);
 
 		assert(res.length == 1);
 		return res;
 	}
 
+	///
 	@property const string toString() @safe
 	{
         import std.conv : to;
@@ -183,20 +202,26 @@ struct RequestEvent {
 
 struct HTMLEvent {
 
-	private string m_content;
-	private immutable URL m_rooturl;
-    int m_level;
-    Base base;
+	const string m_content;
+	immutable URL m_rooturl;
+    const int m_level;
+    const Base base;
     alias base this;
 
+	///
 	this(const string content, const URL root, int lev, const UUID parent) @safe
 	{
-        base = Base(parent, md5UUID(root /*~ content*/ ~ "HTML"));
+        base = Base(parent, md5UUID(root ~ "HTML"));
 		m_content = content;
 		m_rooturl = root.parseURL;
         m_level = lev;
 	}
 
+	/**
+	 * Parse an HTML string and generate
+	 * a Requestevent for every link foundi
+	 * plus a ToFileevent to save the content to file.
+	 */
 	const EventRange resolve() @trusted// TODO safe 
 	{
         import arrogant;
@@ -223,10 +248,11 @@ struct HTMLEvent {
             }
         }
 		string s = tree.document.innerHTML;
-        res.append(ToFileEvent(s, m_rooturl, m_level, this.parent));
+        res.append(ToFileEvent(HTMLPayload(s), m_rooturl, m_level, this.parent));
 		return res;
 	}
 
+	///
 	@property const string toString() @safe
 	{
 		return "HTMLEvent(basedir: " ~ config.projdir ~ ", rooturl: " ~ m_rooturl ~")";
@@ -235,14 +261,15 @@ struct HTMLEvent {
 
 struct ToFileEvent
 {
-	private SumType!(ReceiveAsRange, string) m_content;
-    private immutable URL m_rooturl;
-    private string m_fname;
-    private int m_level;
+	const FileContent m_content;
+    immutable URL m_rooturl;
+    const string m_fname;
+    const int m_level;
     Base base;
     alias base this;
 
-	this(ReceiveAsRange content, const URL url, int level, const ID parent) @safe
+	///
+	this(const FilePayload content, const URL url, int level, const ID parent) @trusted
 	{
 		m_content = content;
         m_rooturl = url.parseURL;
@@ -251,7 +278,8 @@ struct ToFileEvent
         base = Base(parent, md5UUID(m_rooturl ~ "FILE"));
 	}
 
-	this(string content, const URL url, int level, const ID parent) @safe
+	///
+	this(const HTMLPayload content, const URL url, int level, const ID parent) @safe
     {
             m_content = content;
             m_level = level;
@@ -260,6 +288,10 @@ struct ToFileEvent
             base = Base(parent, md5UUID(m_fname ~ "FILE"));
         }
 
+	/**
+	 * Generate the appropriate folder structure and save the file.
+	 * Could check if the file is an HTML and could generate an HTML event.
+	 */
 	const EventRange resolve() @trusted
 	{
 		EventRange res;
@@ -268,8 +300,8 @@ struct ToFileEvent
 		fname.parentPath.makeDirRecursive();
         fname.writeToFile(m_content);
         m_content.match!(
-            (string s) {},
-            (const ReceiveAsRange r) {
+            (const HTMLPayload s) {},
+            (const FilePayload r) {
                 if(config.checkFileAfterSave && isHTMLFile(fname)){
                     string content = readFromFile(fname);
                     res.append(HTMLEvent(content, m_rooturl, m_level, uuid));

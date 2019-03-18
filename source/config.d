@@ -15,6 +15,7 @@ import std.stdio : writeln;
 
 enum CONFIG_FILE = "config.sdl";
 
+///
 struct Config {
 	long maxResSize = 8 * 1024 * 1024; // limits the size of the stream parsed in memory
 	bool checkFileAfterSave = true; // after a file is saved, check if it is HTML and parse it again
@@ -28,7 +29,7 @@ struct Config {
 
 __gshared Config _config;
 
-Config loadConfig(const string path, Config c) @trusted
+private Config loadConfig(const string path, Config c) @trusted
 {
     import std.algorithm.iteration : filter;
     import std.algorithm.searching : canFind;
@@ -51,7 +52,7 @@ Config loadConfig(const string path, Config c) @trusted
 
 	c.rootUrl = root.expectTagValue!string("rootUrl");
 
-    auto globalRule = URLRule(".*", 0, true);
+    auto globalRule = URLRule(".*", 0, true); /// catch-all rule, always at the end
     foreach(val ; root.tags().filter!(s => s.getFullName.name == "rule")){
         auto urlst = val.getValue!string;
         auto lev = val.getValue!int;
@@ -81,8 +82,9 @@ enum CLIResult {
     ERROR
 }
 
-void dumpExampleConfig()
+void dumpExampleConfig() // TODO
 {
+	assert(false);
 }
 
 CLIResult parseCli(string[] args)

@@ -22,13 +22,34 @@ import std.array : split;
  * Module that contains functions related to HTTP, URL schema and HTTP
  */
 
+version(unittest) {
+	bool checkLevel(const string rhs, const string lhs, const long lev, bool isRegex) @safe
+	{
+		auto rule = URLRule(rhs, lev, isRegex);
+		return checkLevel(rule, lhs.parseURL);
+	}
+
+	string asPathOnDisk(const string url) { return url.parseURL.asPathOnDisk; }
+
+	URLRule findRule(const string src, URLRule[] rules) @safe
+	{
+		return findRule(src.parseURL, rules);
+	}
+
+	string toFileName(const string url, const string src, const bool addIndex = true) @safe
+	{
+		return toFileName(url.parseURL, src.parseURL);
+	}
+}
+
+
+alias ParseResult = Tuple!(URL, "url", string, "fname");
+alias parseResult = tuple!("url", "fname");
+
 /**
  * Parse an URL and
  * return a tuple of URL, pathname
  */
-alias ParseResult = Tuple!(URL, "url", string, "fname");
-alias parseResult = tuple!("url", "fname");
-
 ParseResult url_and_path(const string url, const URL absRooturl) @safe
 in{
     assert(url.startsWith("http://") || url.startsWith("https://") || url.startsWith("/"), url);
@@ -45,7 +66,7 @@ do{
         src = url.removeAnchor.parseURL;
     }
 
-	dst = toFileName(src, absRooturl, false);
+	dst = toFileName(src, absRooturl);
     return parseResult(src, dst);
 }
 
@@ -92,12 +113,6 @@ in{
         (url.path.endsWith("/") ? "/index.html" : ""); // index.html if it is a folder
 }
 
-///ditto
-string toFileName(const string url, const string src, const bool addIndex = true) @safe
-{
-    return toFileName(url.parseURL, src.parseURL);
-}
-
 unittest{
 	assert(toFileName("https://fragal.eu/a.html", "https://fragal.eu/") == "a.html");
 	assert(toFileName("https://fragal.eu/a/b.html", "https://fragal.eu/") == "a/b.html");
@@ -123,9 +138,6 @@ string asPathOnDisk(const URL url) @safe
 
     return url.host ~ url.path ~ (url.path.endsWith("/") ? "index.html" : "");
 }
-
-/// ditto
-string asPathOnDisk(const string url) { return url.parseURL.asPathOnDisk; }
 
 unittest{
     assert("http://fragal.eu".asPathOnDisk == "fragal.eu/index.html");
@@ -250,15 +262,8 @@ bool checkLevel(const URLRule rhs, const URL lhs, int currentLev = 0) @safe
         ldiff <= rhs.level - currentLev;
 }
 
-/// ditto
-bool checkLevel(const string rhs, const string lhs, const long lev, bool isRegex) @safe
-{
-    auto rule = URLRule(rhs, lev, isRegex);
-    return checkLevel(rule, lhs.parseURL);
-}
-
 unittest{
-    assert(checkLevel("http://fragal.eu/", "http://fragal.eu", 1, false));
+	assert(checkLevel("http://fragal.eu/", "http://fragal.eu", 1, false));
     assert(checkLevel("http://fragal.eu/", "http://fragal.eu/a/b/c", 3, false));
     assert(!checkLevel("http://fragal.eu/", "http://fragal.eu/a/b/c", 1, false));
     assert(checkLevel("http://fragal.eu", "http://fragal.eu/", 1, false));
@@ -300,13 +305,8 @@ URLRule findRule(const URL src, URLRule[] rules) @safe
     return rules.filter!(rule => rule.matches(src)).takeOne.front;
 }
 
-/// ditto
-URLRule findRule(const string src, URLRule[] rules) @safe
-{
-    return findRule(src.parseURL, rules);
-}
-
 unittest{
+
     URLRule[] rules;
     rules ~= URLRule("fragal.eu", 2, false);
     rules ~= URLRule("https://.*.fragal.eu", 1, true);
@@ -332,7 +332,5 @@ RuleLevel couldRecur(const URL url, const int lev, URLRule current)
     RuleLevel ret;
     auto rule = findRule(url, config.rules);
     int level = rule == current ? lev : 1;
-    // warning(url, " -- ", current.toString, ":", rule.toString, "=", lev,":",level);
-    // warning(rule == current ? "true": "false" );
     return checkLevel(rule, url, level) ? RuleLevel(level) : RuleLevel(DoNotRecur());
 }

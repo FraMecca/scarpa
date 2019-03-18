@@ -20,6 +20,9 @@ import std.range;
 import std.typecons;
 import std.algorithm;
 
+/**
+ * A priority queue with one bin for each type of Event.
+ */
 struct BinnedPQ {
 	EventRange[EventType] bins;
 
@@ -68,6 +71,9 @@ struct BinnedPQ {
 }
 
 // TODO handle update / existing files in the projdirectory before starting the program
+/**
+ * Holds a pointer to the Database, a table of executing tasks and a priority queue of Events yet to be resolved.
+ */
 struct Storage {
 	import d2sqlite3;
 
@@ -83,6 +89,7 @@ struct Storage {
 		mainTid = tid;
 	}
 
+	/// made for std.range and std.algorithm. Resolves to queue.empty
 	@property bool empty() @safe
 	{
 		return queue.empty;
@@ -151,9 +158,7 @@ int main(string[] args)
 		CLIResult.HELP_WANTED, { exit = true; },
 		CLIResult.ERROR, { exit = true; },
 		CLIResult.EXAMPLE_CONF, { dumpExampleConfig(); exit = true; },
-		CLIResult.NEW_PROJECT, {
-            // makeDirRecursive(config.projdir);
-            // dumpConfig();
+		CLIResult.NEW_PROJECT, { // TODO
         },
 		CLIResult.RESUME_PROJECT, { writeln("Resume this project"); }, // TODO import data from db
 		CLIResult.NO_ARGS, { stderr.writeln("No arguments specified"); exit = true; },
@@ -184,11 +189,11 @@ int main(string[] args)
 		storage.tasks[uuid]
 			.getResult()
 			.match!(
-					(EventRange r) {
-						r.each!(e => storage.put(e)); // enqueue
-					},
-					(Unexpected!string s) => logException(s)
-					);
+				(EventRange r) {
+					r.each!(e => storage.put(e)); // enqueue
+				},
+				(Unexpected!string s) => logException(s)
+			);
 		storage.tasks.remove(uuid);
 	}
 

@@ -5,7 +5,7 @@ import vibe.core.path;
 
 import ddash.functional : cond;
 import sumtype : SumType, match;
-import requests : ReceiveAsRange;
+import requests : ReceiveAsRange, Request, Response;
 
 import std.exception: enforce;
 import std.typecons : Tuple, tuple;
@@ -105,7 +105,6 @@ do {
 	return Path(path.toString ~ "/index.html");
 }
 
-alias FileContent = SumType!(ReceiveAsRange, string);
 /**
  * Write to File.
  * Given that many modern webservers don't follow
@@ -113,9 +112,9 @@ alias FileContent = SumType!(ReceiveAsRange, string);
  * it overwrites the file in case two url that differ only bcs of the trailing slash
  * are found
  */
-void writeToFile(const Path fname, inout FileContent content)
+void writeToFile(const Path fname, const FileContent content) @trusted
 {
-    import vibe.core.file : openFile, FileMode, createTempFile;
+    import vibe.core.file : openFile, FileMode, createTempFile, FileStream;
     import std.string : representation;
     import std.algorithm.iteration : each;
 
@@ -125,23 +124,22 @@ void writeToFile(const Path fname, inout FileContent content)
         auto info = getFileInfo(path);
         return info.cond!(
             i => i.isDirectory, { return handleDirExists(path); },
-            // special file
+            // special file TODO
             { return path; }
             );
     }
 
-    auto fp = createTempFile();
-    content.match!(
-        (const string s) {
-            fp.write(s.representation);
-        },
-        (const ReceiveAsRange cr) {
-            auto r = cast(ReceiveAsRange)cr; // cannot use bcs const
-            r.each!((e) => fp.write(e));
-        }
-    );
     auto dst = fname.existsDir ? manageSlash(fname) : fname;
-    copyFile(fp.path, dst, true);
+    content.match!(
+        (const HTMLPayload s) {
+			auto fp = createTempFile(); 
+			fp.write(s.representation);
+			moveFile(fp.path, dst, true);
+		},
+        (const FilePayload pt) {
+			moveFile(pt, dst, true);
+		}
+    );
 }
 
 /**
@@ -156,6 +154,14 @@ string readFromFile(const Path fname)
     return content.assumeUTF;
 }
 
+struct HTMLPayload {
+	string payload;
+	alias payload this;
+	this(string rhs) @safe { payload = rhs; }
+};
+alias FilePayload = Path;
+alias FileContent = SumType!(FilePayload, HTMLPayload);
+
 /**
  * Make an HTTP request given the URL.
  * Either fetch the entire content as a string if it is an HTML page
@@ -163,7 +169,6 @@ string readFromFile(const Path fname)
  */
 FileContent requestUrl(const string url) @trusted
 {
-    import requests : Request;
     import parse : isHTMLFile;
     import std.utf;
 	import std.array : appender;
@@ -173,15 +178,18 @@ FileContent requestUrl(const string url) @trusted
 
 	auto rq = Request();
 	rq.useStreaming = true;
-    rq.sslSetCaCert("/etc/ssl/cert.pem"); // TODO manage
+    rq.sslSetCaCert("/etc/ssl/cert.pem");
 	auto rs = rq.get(url);
 	auto resBody = appender!string;
 
 	if (rs.responseHeaders.isHTMLFile) {
-		rs.receiveAsRange().each!(e => resBody.put(e));
-		ret = resBody.data;
+		auto rg = rs.receiveAsRange;
+		rg.each!(e => resBody.put(e));
+		ret = HTMLPayload(resBody.data);
 	} else {
-		ret = rs.receiveAsRange();
+		auto fp = createTempFile();
+		rs.receiveAsRange.each!((e) => fp.write(e));
+		ret = fp.path;
 	}
 
 	return ret;
