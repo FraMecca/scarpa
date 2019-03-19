@@ -92,6 +92,7 @@ struct _Event{
             debug{
                 warning(e.info);
                 import std.conv : to;
+				writeln(e.msg); // TODO REmove
                 return typeof(return).unexpected(e.file ~":"~e.line.to!string~" "~e.msg);
             } else {
                 return typeof(return).unexpected(e.msg);
@@ -243,7 +244,7 @@ struct HTMLEvent {
 					auto tup = url_and_path(node[href].get(), m_rooturl);
 
 					auto level = couldRecur(tup.url, m_level, currentRule, tag, node);
-					warning("LEVEL: ", level, " ", tup.url);
+					warning("LEVEL: ", level, ":",m_level, " ",tup.url );
 					level.match!(
 						(int l) { res.append(RequestEvent(tup.url, l, this.parent)); },
 						(Asset a) { res.append(RequestEvent(tup.url, 0, this.parent)); },

@@ -331,12 +331,16 @@ alias RuleLevel = SumType!(int, DoNotRecur, Asset); /// Possible return values f
 import arrogant : Node;
 RuleLevel couldRecur(const URL url, const int lev, const URLRule current, const string tag, Node node)
 {
-	if(tag == "script" || (tag == "link" && node["rel"] == "stylesheet")){
+	if(tag == "script" ||
+	   tag == "img" ||
+	   (tag == "link" && node["rel"] == "stylesheet")){
 		return RuleLevel(Asset());
 	} else {
-		RuleLevel ret;
 		auto rule = findRule(url, config.rules);
 		int level = rule == current ? lev + 1 : 1;
-		return checkLevel(rule, url, level) ? RuleLevel(level) : RuleLevel(DoNotRecur());
+		// return checkLevel(rule, url, level) ? RuleLevel(level) : RuleLevel(DoNotRecur());
+		// check level by connections, not path
+		// TODO decide if byPath or byRequests. Config file maybe
+		return rule.level >= level ? RuleLevel(level) : RuleLevel(DoNotRecur());
 	}
 }
