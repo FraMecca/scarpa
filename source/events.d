@@ -222,7 +222,7 @@ struct HTMLEvent {
 	 * a Requestevent for every link foundi
 	 * plus a ToFileevent to save the content to file.
 	 */
-	const EventRange resolve() @trusted// TODO safe 
+	const EventRange resolve() @trusted // trusted until arrogant is @system
 	{
         import arrogant;
 
@@ -233,22 +233,29 @@ struct HTMLEvent {
 
         URLRule currentRule = findRule(m_rooturl, config.rules); // TODO pass instead of recomputing
 
-		// TODO other tags and js and css
-        foreach(ref node; tree.byTagName("a")){
-            if(!node["href"].isNull && node["href"].get.isValidHref){
-                auto tup = url_and_path(node["href"].get(), m_rooturl);
+		import std.range : zip;
+		auto uriKey = ["href", "src", "href", "src",    "src",   "src",   "src"];
+		auto tags =   ["a",    "img", "link", "script", "audio", "video", "track"];
+		foreach(kv; zip(uriKey, tags)){ // TODO check that script and js are always downloaded even if level
+			auto href = kv[0]; auto tag = kv[1];
+			foreach(ref node; tree.byTagName(tag)){
+				if(!node[href].isNull && node[href].get.isValidHref){
+					auto tup = url_and_path(node[href].get(), m_rooturl);
 
-                auto level = couldRecur(tup.url, m_level, currentRule);
-                level.match!(
-                    (int l) { res.append(RequestEvent(tup.url, l, this.parent)); },
-                    (No) {}
-                );
+					auto level = couldRecur(tup.url, m_level, currentRule, tag, node);
+					warning("LEVEL: ", level, " ", tup.url);
+					level.match!(
+						(int l) { res.append(RequestEvent(tup.url, l, this.parent)); },
+						(Asset a) { res.append(RequestEvent(tup.url, 0, this.parent)); },
+						(DoNotRecur d) {}
+					);
 
-                node["href"] = tup.fname; // replace with a filename on disk
-            }
-        }
+					node[href] = tup.fname; // replace with a filename on disk
+				}
+			}
+		}
 		string s = tree.document.innerHTML;
-        res.append(ToFileEvent(HTMLPayload(s), m_rooturl, m_level, this.parent));
+		res.append(ToFileEvent(HTMLPayload(s), m_rooturl, m_level, this.parent));
 		return res;
 	}
 

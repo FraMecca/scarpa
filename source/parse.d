@@ -320,17 +320,23 @@ unittest{
 }
 
 struct DoNotRecur {};
-alias RuleLevel = SumType!(int, DoNotRecur); /// Possible return values for couldRecur
+struct Asset {};
+alias RuleLevel = SumType!(int, DoNotRecur, Asset); /// Possible return values for couldRecur
 /**
  * compare an url against the rule specified for it
  * and return the level of recursion if it passes
  * Levels start from 0
  * but on config file they are specified starting from 1
  */
-RuleLevel couldRecur(const URL url, const int lev, URLRule current)
+import arrogant : Node;
+RuleLevel couldRecur(const URL url, const int lev, const URLRule current, const string tag, Node node)
 {
-    RuleLevel ret;
-    auto rule = findRule(url, config.rules);
-    int level = rule == current ? lev : 1;
-    return checkLevel(rule, url, level) ? RuleLevel(level) : RuleLevel(DoNotRecur());
+	if(tag == "script" || (tag == "link" && node["rel"] == "stylesheet")){
+		return RuleLevel(Asset());
+	} else {
+		RuleLevel ret;
+		auto rule = findRule(url, config.rules);
+		int level = rule == current ? lev + 1 : 1;
+		return checkLevel(rule, url, level) ? RuleLevel(level) : RuleLevel(DoNotRecur());
+	}
 }
