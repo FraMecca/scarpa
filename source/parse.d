@@ -341,6 +341,7 @@ RuleLevel couldRecur(const URL url, const int lev, const URLRule current, const 
 		// return checkLevel(rule, url, level) ? RuleLevel(level) : RuleLevel(DoNotRecur());
 		// check level by connections, not path
 		// TODO decide if byPath or byRequests. Config file maybe
+		// TODO change name of functions (byPath, byReq)
 		return rule.level >= level ? RuleLevel(level) : RuleLevel(DoNotRecur());
 	}
 }
