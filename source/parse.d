@@ -75,23 +75,24 @@ auto segments = (inout string s) => s.split('/').filter!(i => i != "");
  * Converts an URL to a path on the disk
  * relatively to the source that points to the URL
  */
-string toFileName(const URL url, const URL src) @safe
+string toFileName(const URL dst, const URL src) @safe
 in{
-    assert(url.fragment == "",  url);
-}do
-{
+    assert(dst.fragment == "",  dst);
+}out(results){writeln(results);
+}do{
     import std.range : walkLength, zip, repeat, take, tee;
     import std.array : array, join;
     import std.algorithm.iteration : map;
     import std.algorithm.searching : countUntil;
 
     // is it the root of the website?
-    if(url.path == "/" || url.path.empty)
-        return "index.html";
-
-    bool sameHost = url.host == src.host;
-    immutable srcments = src.path.segments.array; // Could store this in URL struct
-    immutable dstments = url.path.segments.array;
+    if((dst.path == "/" || dst.path.empty)
+	   && (src.path == "/" || src.path.empty))
+        return "./index.html";
+	immutable dstpath = dst.path == "/" ? "" : dst.path;
+    bool sameHost = dst.host == src.host;
+    immutable srcments = src.path.segments.array; // Could store this in DST struct
+    immutable dstments = dstpath.segments.array;
 
     long len = sameHost ?
         zip(dstments, srcments)
@@ -103,26 +104,32 @@ in{
     len = len == -1 ? 0 : len;
     immutable splitLen = sameHost ? len : 0;
     if(sameHost && srcments.length != 0)
-        len = dstments.length - len; // now adjust to remove same subfolders
+        len = srcments.length - len; // now adjust to remove same subfolders
+	if(srcments.length != 0 && srcments[$-1].endsWith(".html"))
+		len--;
 
     immutable goUp = "../".repeat.take(len).join;
 
     return goUp ~ // file system hierarchy
-        (sameHost ? "" : url.host ~ "/") ~ // host
+        (sameHost ? "" : dst.host ~ "/") ~ // host
         dstments[splitLen..$].join("/") ~ // path
-        (url.path.endsWith("/") ? "/index.html" : ""); // index.html if it is a folder
+		(dstpath == "" ? "index.html" : "") ~
+        (dstpath.endsWith("/") ? "/index.html" : ""); // index.html if it is a folder
 }
 
 unittest{
 	assert(toFileName("https://fragal.eu/a.html", "https://fragal.eu/") == "a.html");
 	assert(toFileName("https://fragal.eu/a/b.html", "https://fragal.eu/") == "a/b.html");
 	assert(toFileName("https://fragal.eu/b.html", "https://fragal.eu/a") == "../b.html");
+	assert(toFileName("https://fragal.eu/b.html", "https://fragal.eu/a/") == "../b.html");
 	assert(toFileName("https://fragal.eu/a/c/", "https://fragal.eu/a/b/") == "../c/index.html");
 	assert(toFileName("https://fragal.eu/a/c", "https://fragal.eu/a/b/") == "../c");
 	assert(toFileName("https://fragal.eu/c/d/", "https://fragal.eu/a/b/") == "../../c/d/index.html");
 	assert(toFileName("https://francescomecca.eu/A/c.html", "https://fragal.eu/a/b/") == "../../../francescomecca.eu/A/c.html");
-	assert(toFileName("https://fragal.eu/", "https://fragal.eu/") == "index.html");
-	assert(toFileName("https://fragal.eu", "https://fragal.eu/") == "index.html");
+	assert(toFileName("https://fragal.eu/", "https://fragal.eu/") == "./index.html");
+	assert(toFileName("https://fragal.eu", "https://fragal.eu/") == "./index.html");
+	assert(toFileName("https://fragal.eu/assets/vendor/normalize-css/normalize.css", "https://fragal.eu/2018/10/15/mologna.html") == "../../../assets/vendor/normalize-css/normalize.css");
+	assert(toFileName("https://fragal.eu/", "https://fragal.eu/2018/10/15/mologna.html") == "../../../index.html");
 }
 
 /**
