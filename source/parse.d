@@ -70,7 +70,7 @@ do{
     return parseResult(src, dst);
 }
 
-auto segments = (inout string s) => s.split('/').filter!(i => i != "");
+alias segments = (inout string s) => s.split('/').filter!(i => i != "");
 /**
  * Converts an URL to a path on the disk
  * relatively to the source that points to the URL
