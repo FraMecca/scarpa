@@ -32,9 +32,9 @@ alias EventSeq = AliasSeq!(RequestEvent, HTMLEvent, ToFileEvent);
 struct _Event{
     SumType!EventSeq ev;
     alias ev this;
-    this(inout RequestEvent e) @safe { ev = e; }
-    this(inout HTMLEvent e) @safe { ev = e; }
-    this(inout ToFileEvent e) @safe { ev = e; }
+    this(RequestEvent e) @safe { ev = e; }
+    this(HTMLEvent e) @safe { ev = e; }
+    this(ToFileEvent e) @safe { ev = e; }
 
 	@property inout string toString() @safe
 	{
