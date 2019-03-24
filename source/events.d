@@ -162,12 +162,12 @@ struct Base {
 struct RequestEvent {
 
 	immutable URL m_url;
-    const int m_level;
+    const Level m_level;
     const Base base;
     alias base this;
 
 	///
-	this(inout URL url, int lev, const ID parent = ID()) @safe
+	this(inout URL url, Level lev, const ID parent = ID()) @safe
 	{
         base = Base(parent, md5UUID(url.toString ~ "REQUEST"));
 		m_url = url.parseURL;
@@ -205,12 +205,17 @@ struct HTMLEvent {
 
 	const string m_content;
 	immutable URL m_rooturl;
-    const int m_level;
+    const Level m_level;
     const Base base;
     alias base this;
 
+	enum uriKey = ["href", "src", "href", "src",    "src",   "src",   "src"];
+	enum tags =   ["a",    "img", "link", "script", "audio", "video", "track"];
+	import std.range : zip;
+	enum linkTags = zip(uriKey, tags);
+
 	///
-	this(const string content, const URL root, int lev, const UUID parent) @safe
+	this(const string content, const URL root, Level lev, const UUID parent) @safe
 	{
         base = Base(parent, md5UUID(root ~ "HTML"));
 		m_content = content;
@@ -234,22 +239,25 @@ struct HTMLEvent {
 
         URLRule currentRule = findRule(m_rooturl, config.rules); // TODO pass instead of recomputing
 
-		import std.range : zip;
-		auto uriKey = ["href", "src", "href", "src",    "src",   "src",   "src"];
-		auto tags =   ["a",    "img", "link", "script", "audio", "video", "track"];
-		foreach(kv; zip(uriKey, tags)){ // TODO check that script and js are always downloaded even if level
+		foreach(kv; linkTags){ // TODO check that script and js are always downloaded even if level
 			auto href = kv[0]; auto tag = kv[1];
 			foreach(ref node; tree.byTagName(tag)){
 				if(!node[href].isNull && node[href].get.isValidHref){
 					auto tup = url_and_path(node[href].get(), m_rooturl);
 
-					auto level = couldRecur(tup.url, m_level, currentRule, tag, node);
-					warning("LEVEL: ", level, ":",m_level, " ",tup.url );
-					level.match!(
-						(int l) { res.append(RequestEvent(tup.url, l, this.parent)); },
-						(Asset a) { res.append(RequestEvent(tup.url, 0, this.parent)); },
-						(DoNotRecur d) {}
-					);
+					m_level.match!((Asset a) {},
+								   (DoNotRecur d) {},
+								   (int n) {
+									   auto level = couldRecur(tup.url, n, currentRule, tag, node);
+									   level.match!((int l){
+											   res.append(RequestEvent(tup.url, level, this.parent));
+										   },
+													(Asset a){
+														res.append(RequestEvent(tup.url, level, this.parent));
+													},
+													(DoNotRecur d) {}
+										   );
+						});
 
 					node[href] = tup.fname; // replace with a filename on disk
 				}
@@ -272,12 +280,12 @@ struct ToFileEvent
 	const FileContent m_content;
     immutable URL m_rooturl;
     const string m_fname;
-    const int m_level;
+    const Level m_level;
     Base base;
     alias base this;
 
 	///
-	this(const FilePayload content, const URL url, int level, const ID parent) @trusted
+	this(const FilePayload content, const URL url, Level level, const ID parent) @trusted
 	{
 		m_content = content;
         m_rooturl = url.parseURL;
@@ -287,7 +295,7 @@ struct ToFileEvent
 	}
 
 	///
-	this(const HTMLPayload content, const URL url, int level, const ID parent) @safe
+	this(const HTMLPayload content, const URL url, Level level, const ID parent) @safe
     {
             m_content = content;
             m_level = level;

@@ -7,7 +7,7 @@ import logger;
 import url;
 
 import ddash.functional : cond;
-import sumtype;
+import sumtype : match, SumType;
 
 import std.typecons : Tuple, tuple;
 import std.algorithm.searching : startsWith, endsWith;
@@ -328,7 +328,7 @@ unittest{
 
 struct DoNotRecur {};
 struct Asset {};
-alias RuleLevel = SumType!(int, DoNotRecur, Asset); /// Possible return values for couldRecur
+alias Level = SumType!(int, DoNotRecur, Asset); /// Possible return values for couldRecur
 /**
  * compare an url against the rule specified for it
  * and return the level of recursion if it passes
@@ -336,19 +336,23 @@ alias RuleLevel = SumType!(int, DoNotRecur, Asset); /// Possible return values f
  * but on config file they are specified starting from 1
  */
 import arrogant : Node;
-RuleLevel couldRecur(const URL url, const int lev, const URLRule current, const string tag, Node node)
+Level couldRecur(const URL url, const int lev, const URLRule current, const string tag, Node node)
 {
+	typeof(return) ret;
 	if(tag == "script" ||
 	   tag == "img" ||
 	   (tag == "link" && node["rel"] == "stylesheet")){
-		return RuleLevel(Asset());
+		ret = Asset();
 	} else {
 		auto rule = findRule(url, config.rules);
 		int level = rule == current ? lev + 1 : 1;
-		// return checkLevel(rule, url, level) ? RuleLevel(level) : RuleLevel(DoNotRecur());
+		if(rule.level >= level) ret = level;
+		else ret = DoNotRecur();
+		// ret =  checkLevel(rule, url, level) ? Level(level) : Level(DoNotRecur());
 		// check level by connections, not path
 		// TODO decide if byPath or byRequests. Config file maybe
 		// TODO change name of functions (byPath, byReq)
-		return rule.level >= level ? RuleLevel(level) : RuleLevel(DoNotRecur());
 	}
+
+	return ret;
 }
