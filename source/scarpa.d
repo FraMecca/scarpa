@@ -21,6 +21,15 @@ import std.typecons;
 import std.algorithm;
 
 /**
+ * Allows to assert(false) inside a function that requires a return value;
+ */
+template assertFail(T){
+	T assertFail(){
+		assert(false);
+	}
+}
+
+/**
  * A priority queue with one bin for each type of Event.
  */
 struct BinnedPQ {
