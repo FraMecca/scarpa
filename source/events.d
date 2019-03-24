@@ -43,24 +43,28 @@ struct _Event{
 
     const JSONValue toJson() @safe
     {
+		enum levelString = `j["level"] = _ev.m_level.match!((int n) => n.to!string,
+					 (Asset a) => "asset",
+					 (DoNotRecur a) => "donotrecur");`;
+
         return ev.match!(
             (inout RequestEvent _ev) {
                 auto j = JSONValue();
                 j["url"] = _ev.m_url.toString;
-                j["level"] = _ev.m_level;
+                mixin(levelString);
                 return j;},
             (inout HTMLEvent _ev) {
                 auto j = JSONValue();
                 j["url"] = _ev.m_rooturl.toString;
-                j["level"] = _ev.m_level;
+                mixin(levelString);
                 return j;
             },
             (inout ToFileEvent _ev) {
                 auto j = JSONValue();
                 j["fname"] = _ev.m_fname;
                 j["url"] = _ev.m_rooturl.toString;
-                j["level"] = _ev.m_level;
-                return j;
+                mixin(levelString);
+                return j; 
             });
     }
 
@@ -124,7 +128,7 @@ template makeEvent(alias t)
  */
 auto firstEvent(string rootUrl)
 {
-    auto r = RequestEvent(rootUrl.parseURL, 0);
+    auto r = RequestEvent(rootUrl.parseURL, Level(0));
 	Event req = makeEvent!(r);
     return req;
 }
@@ -182,11 +186,16 @@ struct RequestEvent {
 	const EventRange resolve() @safe
 	{
 		EventRange res;
+		import std.meta;
+		import scarpa;
 
-		requestUrl(m_url.toString).match!(
-            (const FilePayload stream) => res.append(ToFileEvent(stream, m_url, m_level, this.uuid)),
-			(const HTMLPayload raw) => res.append(HTMLEvent(raw, m_url, m_level, this.uuid))
-			);
+		auto isAsset = m_level.match!((int n) => false,
+									  (Asset a) => true,
+									  (DoNotRecur d) => assertFail!bool);
+		requestUrl(m_url.toString, isAsset).match!((const FilePayload stream) => res.append(ToFileEvent(stream, m_url, m_level, this.uuid)),
+												   (const HTMLPayload raw) {
+																			res.append(HTMLEvent(raw, m_url, m_level, this.uuid));
+												   });
 
 		assert(res.length == 1);
 		return res;

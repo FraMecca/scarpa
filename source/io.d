@@ -167,12 +167,14 @@ alias FileContent = SumType!(FilePayload, HTMLPayload);
  * Either fetch the entire content as a string if it is an HTML page
  * or return an OutputRange containing binary data
  */
-FileContent requestUrl(const string url) @trusted
+FileContent requestUrl(const string url, bool isAsset) @trusted
 {
     import parse : isHTMLFile;
     import std.utf;
 	import std.array : appender;
 	import std.algorithm.iteration : each;
+	import std.exception : enforce;
+	import std.conv : to;
 
 	typeof(return) ret;
 
@@ -182,7 +184,8 @@ FileContent requestUrl(const string url) @trusted
 	auto rs = rq.get(url);
 	auto resBody = appender!string;
 
-	if (rs.responseHeaders.isHTMLFile) {
+	enforce(rs.code < 400, "HTTP Response: " ~ rs.code.to!string);
+	if (!isAsset && rs.responseHeaders.isHTMLFile) {
 		auto rg = rs.receiveAsRange;
 		rg.each!(e => resBody.put(e));
 		ret = HTMLPayload(resBody.data);
