@@ -45,7 +45,7 @@ struct _Event{
     {
 		enum levelString = `j["level"] = _ev.m_level.match!((int n) => n.to!string,
 					 (Asset a) => "asset",
-					 (DoNotRecur a) => "donotrecur");`;
+					 (StopRecur a) => "donotrecur");`;
 
         return ev.match!(
             (inout RequestEvent _ev) {
@@ -191,7 +191,7 @@ struct RequestEvent {
 
 		auto isAsset = m_level.match!((int n) => false,
 									  (Asset a) => true,
-									  (DoNotRecur d) => assertFail!bool);
+									  (StopRecur d) => assertFail!bool);
 		requestUrl(m_url.toString, isAsset).match!((const FilePayload stream) => res.append(ToFileEvent(stream, m_url, m_level, this.uuid)),
 												   (const HTMLPayload raw) {
 																			res.append(HTMLEvent(raw, m_url, m_level, this.uuid));
@@ -255,7 +255,7 @@ struct HTMLEvent {
 					auto tup = url_and_path(node[href].get(), m_rooturl);
 
 					m_level.match!((Asset a) {},
-								   (DoNotRecur d) {},
+								   (StopRecur d) {},
 								   (int n) {
 									   auto level = couldRecur(tup.url, n, currentRule, tag, node);
 									   level.match!((int l){
@@ -264,7 +264,7 @@ struct HTMLEvent {
 													(Asset a){
 														res.append(RequestEvent(tup.url, level, this.parent));
 													},
-													(DoNotRecur d) {}
+													(StopRecur d) {}
 										   );
 						});
 

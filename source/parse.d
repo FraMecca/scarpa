@@ -326,9 +326,9 @@ unittest{
     assert(findRule("https://francescomecca.eu", rules) == rules[$-1]);
 }
 
-struct DoNotRecur {};
+struct StopRecur {};
 struct Asset {};
-alias Level = SumType!(int, DoNotRecur, Asset); /// Possible return values for couldRecur
+alias Level = SumType!(int, StopRecur, Asset); /// Possible return values for couldRecur
 /**
  * compare an url against the rule specified for it
  * and return the level of recursion if it passes
@@ -347,8 +347,8 @@ Level couldRecur(const URL url, const int lev, const URLRule current, const stri
 		auto rule = findRule(url, config.rules);
 		int level = rule == current ? lev + 1 : 1;
 		if(rule.level >= level) ret = level;
-		else ret = DoNotRecur();
-		// ret =  checkLevel(rule, url, level) ? Level(level) : Level(DoNotRecur());
+		else ret = StopRecur();
+		// ret =  checkLevel(rule, url, level) ? Level(level) : Level(StopRecur());
 		// check level by connections, not path
 		// TODO decide if byPath or byRequests. Config file maybe
 		// TODO change name of functions (byPath, byReq)

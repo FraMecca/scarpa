@@ -64,11 +64,10 @@ struct BinnedPQ {
 
 	void put(Event ev) @safe
 	{
-		ev.match!(
-				(RequestEvent e) => bins[EventType.RequestEvent] ~= makeEvent!e,
-				(HTMLEvent e) => bins[EventType.HTMLEvent] ~= makeEvent!e,
-				(inout ToFileEvent e) => bins[EventType.ToFileEvent] ~= makeEvent!e
-				);
+		ev.match!((RequestEvent e) => bins[EventType.RequestEvent] ~= makeEvent!e,
+				  (HTMLEvent e) => bins[EventType.HTMLEvent] ~= makeEvent!e,
+				  (inout ToFileEvent e) => bins[EventType.ToFileEvent] ~= makeEvent!e
+		);
 	}
 
     @property ulong length() @safe
