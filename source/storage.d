@@ -1,4 +1,4 @@
-module database;
+module storage;
 
 import events;
 import logger;
@@ -6,11 +6,17 @@ import config : config;
 
 import d2sqlite3;
 import sumtype;
+import vibe.core.concurrency;
+import vibe.core.task;
 
 import std.algorithm.mutation : move;
 import std.json;
 import std.typecons;
 import std.uuid;
+import std.range;
+import std.typecons;
+import std.algorithm;
+
 
 auto createDB(const string location) @trusted
 {
@@ -151,4 +157,123 @@ void setResolved(ref Database db, Event ev) @trusted
 
 	statement.execute();
 	statement.reset(); // Need to reset the statement after execution.
+}
+
+/**
+ * A priority queue with one bin for each type of Event.
+ */
+struct BinnedPQ {
+	EventRange[EventType] bins;
+
+	@property bool empty() @safe
+	{
+		foreach(bin; bins) {
+			if(!bin.empty) return false;
+		}
+		return true;
+	}
+
+	@property Event front() @safe
+	{
+		import std.stdio;
+		static foreach_reverse(T; EventSeq) {
+			mixin("if(EventType."~T.stringof~" in bins && !bins[EventType."~T.stringof~"].empty)
+					return bins[EventType."~T.stringof~"].front;");
+		}
+		assert(false, "Cannot return front from an empty BinnedPQ");
+	}
+
+	void popFront() @safe
+	{
+		static foreach_reverse(T; EventSeq) {
+			mixin("if(EventType."~T.stringof~" in bins && !bins[EventType."~T.stringof~"].empty)
+					{ bins[EventType."~T.stringof~"].popFront(); return; }");
+		}
+		assert(false, "Cannot pop front from an empty BinnedPQ");
+	}
+
+	void put(Event ev) @safe
+	{
+		ev.match!((RequestEvent e) => bins[EventType.RequestEvent] ~= makeEvent!e,
+				  (HTMLEvent e) => bins[EventType.HTMLEvent] ~= makeEvent!e,
+				  (inout ToFileEvent e) => bins[EventType.ToFileEvent] ~= makeEvent!e
+		);
+	}
+
+    @property ulong length() @safe
+    {
+        ulong a;
+        foreach(b; bins) a += b.length;
+        return a;
+    }
+}
+
+// TODO handle update / existing files in the projdirectory before starting the program
+/**
+ * Holds a pointer to the Database, a table of executing tasks and a priority queue of Events yet to be resolved.
+ */
+struct Storage {
+
+	Database db;
+	Future!(EventResult)[string] tasks;
+	BinnedPQ queue;
+	Tid mainTid;
+
+	this(const string location, Event first, Tid tid) @safe
+	{
+		db = createDB(location);
+		queue.put(first);
+		mainTid = tid;
+	}
+
+	/// made for std.range and std.algorithm. Resolves to queue.empty
+	@property bool empty() @safe
+	{
+		return queue.empty;
+	}
+
+	@property Event front() @safe
+	{
+		assert(!empty(), "Cannot fetch front from an empty Storage Range");
+
+		return queue.front;
+	}
+
+	@property bool toSkip(Event ev) @safe
+	{
+		if(db.testEvent(ev))
+            return true;
+		else
+            return false;
+	}
+
+	void popFront() @safe
+	{
+		assert(!empty(), "Cannot pop the front from an empty Storage Range");
+		queue.popFront();
+	}
+
+	void put(Event ev) @safe
+	{
+		if(toSkip(ev))  return;
+		queue.put(ev);
+	}
+
+	void fire(Event ev) @trusted
+	{
+		assert(!toSkip(ev));
+
+		db.insertEvent(ev);
+		immutable uuid = ev.uuid.get.toString;
+
+		auto go() {
+			auto results = ev.resolve;
+			db.setResolved(ev);
+			mainTid.send(uuid);
+			return results;
+		}
+
+		auto task = async(&go);
+		tasks[uuid] = task;
+	}
 }
