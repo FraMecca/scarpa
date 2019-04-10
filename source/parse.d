@@ -78,7 +78,7 @@ alias segments = (inout string s) => s.split('/').filter!(i => i != "");
 string toFileName(const URL dst, const URL src) @safe
 in{
     assert(dst.fragment == "",  dst);
-}out(results){writeln(results);
+// }out(results){writeln(results);
 }do{
     import std.range : walkLength, zip, repeat, take, tee;
     import std.array : array, join;

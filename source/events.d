@@ -86,7 +86,6 @@ struct _Event{
 
     const EventResult resolve() @safe
     {
-		log(this.toString);
 		try {
 			return typeof(return).expected(ev.match!(
 					(inout RequestEvent _ev) => _ev.resolve(),
@@ -96,7 +95,6 @@ struct _Event{
             debug{
                 warning(e.info);
                 import std.conv : to;
-				writeln(e.msg); // TODO REmove
                 return typeof(return).unexpected(e.file ~":"~e.line.to!string~" "~e.msg);
             } else {
                 return typeof(return).unexpected(e.msg);
