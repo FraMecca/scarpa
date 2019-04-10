@@ -190,10 +190,11 @@ struct RequestEvent {
 		auto isAsset = m_level.match!((int n) => false,
 									  (Asset a) => true,
 									  (StopRecur d) => assertFail!bool);
-		requestUrl(m_url.toString, isAsset).match!((const FilePayload stream) => res.append(ToFileEvent(stream, m_url, m_level, this.uuid)),
-												   (const HTMLPayload raw) {
-																			res.append(HTMLEvent(raw, m_url, m_level, this.uuid));
-												   });
+		requestUrl(m_url.toString, isAsset).match!((const FilePayload stream) =>
+														res.append(ToFileEvent(stream, m_url, m_level, this.uuid)),
+												   (const HTMLPayload raw) =>
+														res.append(HTMLEvent(raw, m_url, m_level, this.uuid))
+												   );
 
 		assert(res.length == 1);
 		return res;
