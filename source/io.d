@@ -10,8 +10,6 @@ import requests : ReceiveAsRange, Request, Response;
 import std.exception: enforce;
 import std.typecons : Tuple, tuple;
 
-// TODO : manage special files
-
 /**
  * Functions related to disk I/O
  */
@@ -31,10 +29,11 @@ void makeDirRecursive(const Path src)
     if(!parent.existsDir) makeDirRecursive(parent);
     auto parentInfo = parent.getFileInfo;
 
-    // check for special file
     parentInfo.cond!(
         p => p.isDirectory, {},
-        // special
+        p => !p.isFile && !p.isDirectory, {
+            enforce(false, "Special file inside work directory: " ~ parent.to!string);
+        },
         { handleFileExists(parent); } // is a file
     );
 
@@ -46,7 +45,9 @@ void makeDirRecursive(const Path src)
 
       dir.cond!(
           d => d.isDirectory, {},
-          // special
+          d => !d.isFile && !d.isDirectory, {
+              enforce(false, "Special file inside work directory: " ~ dir.to!string);
+          },
           d => handleFileExists(path), // is a file
       );
     }
@@ -124,7 +125,9 @@ void writeToFile(const Path fname, const FileContent content) @trusted
         auto info = getFileInfo(path);
         return info.cond!(
             i => i.isDirectory, { return handleDirExists(path); },
-            // special file TODO
+            i => !i.isFile && !i.isDirectory, {
+                enforce(false, "Special file inside work directory: " ~ path.to!string);
+            },
             { return path; }
             );
     }
