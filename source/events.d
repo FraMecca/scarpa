@@ -247,7 +247,7 @@ struct HTMLEvent {
 
         URLRule currentRule = findRule(m_rooturl, config.rules); // TODO pass instead of recomputing
 
-		foreach(kv; linkTags){ // TODO check that script and js are always downloaded even if level
+		foreach(kv; linkTags){
 			auto href = kv[0]; auto tag = kv[1];
 			foreach(ref node; tree.byTagName(tag)){
 				if(!node[href].isNull && node[href].get.isValidHref){
