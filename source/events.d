@@ -245,7 +245,7 @@ struct HTMLEvent {
         auto arrogante = Arrogant();
    		auto tree = arrogante.parse(m_content);
 
-        URLRule currentRule = findRule(m_rooturl, config.rules); // TODO pass instead of recomputing
+        URLRule currentRule = findRule(m_rooturl, config.rules);
 
 		foreach(kv; linkTags){
 			auto href = kv[0]; auto tag = kv[1];
