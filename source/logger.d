@@ -5,12 +5,13 @@ enum  WARNING = "\033[93m"; // yellow
 enum  ERROR = "\033[91m"; // red
 enum  END = "\033[0m";
 
-void enableLogging(const string path)
+void enableLogging(const string logPath, const string errorPath)
 {
 
     auto m = new MultiLogger();
     m.insertLogger("stdout", new ColoredLogger(stdout));
-    m.insertLogger("error", new FileLogger(path, LogLevel.error, CreateFolder.yes));
+    m.insertLogger("error", new FileLogger(errorPath, LogLevel.error));
+	m.insertLogger("info", new UnformattedFileLogger(logPath, LogLevel.info));
     sharedLog = m; // register as global logger
 }
 
@@ -42,5 +43,22 @@ class ColoredLogger : FileLogger
         }
         this.logMsgPart(msg.data);
         this.finishLogMsg();
+    }
+}
+
+class UnformattedFileLogger : FileLogger
+{
+    this(const string file, const LogLevel lv = LogLevel.all) @safe
+    {
+        super(file, lv);
+    }
+
+    override void writeLogMsg(ref LogEntry payload) @trusted
+    {
+        auto ll = payload.logLevel;
+        if(ll == LogLevel.info){
+        	this.logMsgPart(payload.msg);
+        	this.finishLogMsg();
+        }
     }
 }

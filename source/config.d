@@ -17,13 +17,14 @@ enum CONFIG_FILE = "config.sdl";
 
 ///
 struct Config {
-	long maxResSize = 8 * 1024 * 1024; // limits the size of the stream parsed in memory
-	int maxEvents = 256; // number of events processed concurrently
-	bool checkFileAfterSave = true; // after a file is saved, check if it is HTML and parse it again
+	long maxResSize; // limits the size of the stream parsed in memory
+	int maxEvents; // number of events processed concurrently
+	bool checkFileAfterSave; // after a file is saved, check if it is HTML and parse it again
     string projdir; // considered project name
     string rootUrl;
-    long kbps = 0;
-    string log = "scarpa.error.log";
+    long kbps;
+    string log;
+	string errorLog;
     URLRule[] rules;
 	// wildcard on type of file TODO
 }
@@ -48,10 +49,11 @@ private Config loadConfig(const string path, Config c) @trusted
 	auto root = parseSource(dst.data);
 
 	c.maxResSize = root.getTagValue!long("maxResSize", 8 * 1024 * 1024);
-	c.maxEvents = root.getTagValue!int("maxEvents", 256);
+	c.maxEvents = root.getTagValue!int("maxEvents", 64);
 	c.kbps = root.getTagValue!long("kbps", 0);
 	c.checkFileAfterSave = root.getTagValue!bool("checkFileAfterSave", true);
-	c.log = root.getTagValue!string("log", "scarpa.error.log");
+	c.errorLog = root.getTagValue!string("errorLog", "scarpa.error.log");
+	c.log = root.getTagValue!string("log", "scarpa.log");
 
 	c.rootUrl = root.expectTagValue!string("rootUrl");
 

@@ -3,6 +3,7 @@ module storage;
 import events;
 import logger;
 import config : config;
+import scarpa : assertFail;
 
 import d2sqlite3;
 import sumtype;
@@ -55,11 +56,13 @@ void insertEvent(ref Database db, Event e) @trusted
         VALUES (:type, :resolved, :uuid, :parent, :data)"
     );
 	statement.bind(":type", e.match!(
+          (inout LogEvent _ev) => assertFail!EventType(),
           (inout RequestEvent _ev) => EventType.RequestEvent,
           (inout HTMLEvent _ev) => EventType.HTMLEvent,
           (inout ToFileEvent _ev) => EventType.ToFileEvent,
     ));
 	statement.bind(":resolved", e.match!(
+          (inout LogEvent _ev) => assertFail!bool(),
           (inout RequestEvent _ev) => false,
           (inout HTMLEvent _ev) => true,
           (const ToFileEvent _ev) => true,
@@ -93,6 +96,7 @@ void insertEvent(ref Database db, Event e) @trusted
     }
 
 	e.match!(
+			 (inout LogEvent _ev) {},
              (inout RequestEvent _ev) {},
              (inout HTMLEvent _ev) {},
              (inout ToFileEvent _ev) { updateGrandParent(db, e.parent); },
@@ -196,7 +200,8 @@ struct BinnedPQ {
 	{
 		ev.match!((RequestEvent e) => bins[EventType.RequestEvent] ~= makeEvent!e,
 				  (HTMLEvent e) => bins[EventType.HTMLEvent] ~= makeEvent!e,
-				  (inout ToFileEvent e) => bins[EventType.ToFileEvent] ~= makeEvent!e
+				  (inout ToFileEvent e) => bins[EventType.ToFileEvent] ~= makeEvent!e,
+				  (LogEvent e) => bins[EventType.LogEvent] ~= makeEvent!e
 		);
 	}
 
@@ -261,9 +266,14 @@ struct Storage {
 
 	void fire(Event ev) @trusted
 	{
-		assert(!toSkip(ev));
+		ev.match!(
+			(LogEvent l) {},
+			(_) {
+					assert(!toSkip(ev));
+					db.insertEvent(ev);
+				}
+			);
 
-		db.insertEvent(ev);
 		immutable uuid = ev.uuid.get.toString;
 
 		auto go() {

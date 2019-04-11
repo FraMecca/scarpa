@@ -5,6 +5,7 @@ import io;
 import config : config;
 import logger;
 import url;
+import scarpa : assertFail;
 
 import sumtype;
 import ddash.functional : cond;
@@ -20,14 +21,15 @@ import std.json;
 import std.meta;
 
 enum EventType { // order of execution for BinnedPQ
-           ToFileEvent = 0,
-           HTMLEvent = 1,
-           RequestEvent = 2,
+		   LogEvent = 0,
+           ToFileEvent = 1,
+           HTMLEvent = 2,
+           RequestEvent = 3,
 };
 
 alias EventRange = Event[];
 alias EventResult = Expect!(EventRange, string);
-alias EventSeq = AliasSeq!(RequestEvent, HTMLEvent, ToFileEvent);
+alias EventSeq = AliasSeq!(LogEvent, RequestEvent, HTMLEvent, ToFileEvent);
 
 struct _Event{
     SumType!EventSeq ev;
@@ -35,6 +37,7 @@ struct _Event{
     this(RequestEvent e) @safe { ev = e; }
     this(HTMLEvent e) @safe { ev = e; }
     this(ToFileEvent e) @safe { ev = e; }
+	this(LogEvent e) @safe { ev = e; }
 
 	@property inout string toString() @safe
 	{
@@ -48,6 +51,9 @@ struct _Event{
 					 (StopRecur a) => "donotrecur");`;
 
         return ev.match!(
+			(inout LogEvent _ev) {
+				return assertFail!JSONValue("LogEvent should not be serialized");
+			},
             (inout RequestEvent _ev) {
                 auto j = JSONValue();
                 j["url"] = _ev.m_url.toString;
@@ -71,6 +77,9 @@ struct _Event{
     const parent() @safe
     {
         return ev.match!(
+			(const LogEvent _ev) {
+				return assertFail!ID("LogEvent should not be serialized");
+			},
             (const RequestEvent _ev) => _ev.parent,
             (const HTMLEvent _ev) => _ev.parent,
             (const ToFileEvent _ev) => _ev.parent);
@@ -79,6 +88,7 @@ struct _Event{
     const uuid() @safe
     {
         return ev.match!(
+			(const LogEvent _ev) => _ev.uuid,
             (const RequestEvent _ev) => _ev.uuid,
             (const HTMLEvent _ev) => _ev.uuid,
             (const ToFileEvent _ev) => _ev.uuid);
@@ -88,6 +98,7 @@ struct _Event{
     {
 		try {
 			return typeof(return).expected(ev.match!(
+					(inout LogEvent _ev) => _ev.resolve(),
 					(inout RequestEvent _ev) => _ev.resolve(),
 					(inout HTMLEvent _ev) => _ev.resolve(),
 					(inout ToFileEvent _ev) => _ev.resolve()));
@@ -168,7 +179,6 @@ struct RequestEvent {
     const Base base;
     alias base this;
 
-	///
 	this(inout URL url, Level lev, const ID parent = ID()) @safe
 	{
         base = Base(parent, md5UUID(url.toString ~ "REQUEST"));
@@ -190,11 +200,16 @@ struct RequestEvent {
 		auto isAsset = m_level.match!((int n) => false,
 									  (Asset a) => true,
 									  (StopRecur d) => assertFail!bool);
-		requestUrl(m_url.toString, isAsset).match!((const FilePayload stream) =>
+		try {
+			requestUrl(m_url.toString, isAsset).match!((const FilePayload stream) =>
 														res.append(ToFileEvent(stream, m_url, m_level, this.uuid)),
 												   (const HTMLPayload raw) =>
 														res.append(HTMLEvent(raw, m_url, m_level, this.uuid))
 												   );
+		} catch(Exception e) {
+			immutable LogPayload p = ErrorResult(e.msg);
+			res.append(LogEvent(m_url, p));
+		}
 
 		assert(res.length == 1);
 		return res;
@@ -322,7 +337,7 @@ struct ToFileEvent
 
         auto fname = Path(m_fname);
 		fname.parentPath.makeDirRecursive();
-        fname.writeToFile(m_content);
+        immutable fsize = fname.writeToFile(m_content);
         m_content.match!(
             (const HTMLPayload s) {},
             (const FilePayload r) {
@@ -332,6 +347,8 @@ struct ToFileEvent
                 }
             }
         );
+		immutable LogPayload p = FileResult(m_fname, fsize);
+		res.append(LogEvent(m_rooturl, p));
 
         return res;
 	}
@@ -340,4 +357,65 @@ struct ToFileEvent
 	{
 		return "ToFileEvent(basedir: " ~ config.projdir ~ ", file: " ~ m_fname ~ " url:" ~ m_rooturl ~ ")";
 	}
+}
+
+alias ErrorCode = string;
+
+struct FileResult {
+    const string name;
+	const ulong size;
+}
+
+struct ErrorResult {
+	const ErrorCode code;
+}
+
+alias LogPayload = SumType!(FileResult, ErrorResult);
+
+struct LogEvent {
+	import std.datetime.systime : SysTime, Clock;
+	import std.conv : to;
+
+    immutable URL m_requrl;
+	const SysTime m_reqTime;
+	const LogPayload m_payload;
+    const Base base;
+    alias base this;
+
+
+	this(const URL requrl, const LogPayload payload) @safe
+	{
+		m_reqTime = Clock.currTime();
+		m_requrl = requrl.parseURL;
+		m_payload = payload;
+        base = Base(ID(), md5UUID(m_requrl ~ "LOG"));
+
+		// DATE TIME URL FILENAME:FILESIZE
+		// DATE TIME URL ERROR
+		string res = m_payload.match!(
+					(FileResult f) => "[S] ",
+					(ErrorResult e) => "[E] "
+					)
+	    	~ m_reqTime.toSimpleString()
+			~ " "
+			~ m_payload.match!(
+					(FileResult f) => f.name ~ ":" ~ f.size.to!string,
+					(ErrorResult e) => "\"" ~ e.code.to!string ~ "\""
+					)
+			~ " "
+			~ m_requrl.toString;
+
+		// log to logPath
+		info(res);
+
+	}
+
+	/// empty since no priority
+	const EventRange resolve() @trusted
+	{
+		typeof(return) r;
+
+		return r;
+	}
+
 }

@@ -61,16 +61,16 @@ int main(string[] args)
 void startProject()
 {
     import std.range;
-	enableLogging(config.log);
+	enableLogging(config.log, config.errorLog);
 
 	warning(config.projdir);
 
 	auto first = firstEvent(config.rootUrl);
 	auto storage = Storage(config.projdir ~ "/scarpa.db", first, thisTid);
 	auto maxEvents = config.maxEvents;
+	uint cntEvents;
 
 	while(true){
-		uint cntEvents;
 		storage
 			.take(maxEvents - cntEvents)
 			.filter!((Event e) => !storage.toSkip(e)) 

@@ -115,7 +115,7 @@ do {
  * it overwrites the file in case two url that differ only bcs of the trailing slash
  * are found
  */
-void writeToFile(const Path fname, const FileContent content) @trusted
+ulong writeToFile(const Path fname, const FileContent content) @trusted
 {
     import vibe.core.file : openFile, FileMode, createTempFile, FileStream;
     import std.string : representation;
@@ -145,6 +145,8 @@ void writeToFile(const Path fname, const FileContent content) @trusted
 			moveFile(pt, dst, true);
 		}
     );
+
+	return getFileInfo(dst).size;
 }
 
 /**
