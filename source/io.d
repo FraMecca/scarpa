@@ -175,9 +175,12 @@ alias FileContent = SumType!(FilePayload, HTMLPayload);
 FileContent requestUrl(const string url, bool isAsset) @trusted
 {
     import parse : isHTMLFile;
+    import config : config;
     import std.utf;
 	import std.array : appender;
 	import std.algorithm.iteration : each;
+    import core.time : msecs;
+    import vibe.core.core : sleep;
 
 	typeof(return) ret;
 
@@ -188,13 +191,32 @@ FileContent requestUrl(const string url, bool isAsset) @trusted
 	auto resBody = appender!string;
 
 	enforce(rs.code < 400, "HTTP Response: " ~ rs.code.to!string);
+
+
+    immutable kbps = config.kbps * 8 * 1024;
+    long bitWritten;
+
+    // respect speed limit configured by user
+    void wait(const ubyte[] buf){
+        while(kbps > 0 && buf.length + bitWritten > kbps){
+            sleep(200.msecs);
+            bitWritten /= 5;
+        }
+        bitWritten += buf.length;
+    }
+
 	if (!isAsset && rs.responseHeaders.isHTMLFile) {
-		auto rg = rs.receiveAsRange;
-		rg.each!(e => resBody.put(e));
+		rs.receiveAsRange.each!((buf) {
+            wait(buf);
+            resBody.put(buf);
+        });
 		ret = HTMLPayload(resBody.data);
 	} else {
 		auto fp = createTempFile();
-		rs.receiveAsRange.each!((e) => fp.write(e));
+		rs.receiveAsRange.each!((buf) {
+            wait(buf);
+            fp.write(buf);
+        });
 		ret = fp.path;
 	}
 
