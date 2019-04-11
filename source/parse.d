@@ -344,14 +344,13 @@ Level couldRecur(const URL url, const int lev, const URLRule current, const stri
 	   (tag == "link" && node["rel"] == "stylesheet")){
 		ret = Asset();
 	} else {
+		// check level by connections, not path
 		auto rule = findRule(url, config.rules);
 		int level = rule == current ? lev + 1 : 1;
 		if(rule.level >= level) ret = level;
 		else ret = StopRecur();
 		// ret =  checkLevel(rule, url, level) ? Level(level) : Level(StopRecur());
-		// check level by connections, not path
 		// TODO decide if byPath or byRequests. Config file maybe
-		// TODO change name of functions (byPath, byReq)
 	}
 
 	return ret;

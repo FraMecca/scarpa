@@ -25,7 +25,6 @@ struct Config {
     long kbps = 0;
     string log = "scarpa.error.log";
     URLRule[] rules;
-	// TODO kb/sec max
 	// wildcard on type of file TODO
 }
 
