@@ -1,14 +1,16 @@
 module io;
 
+import std.exception: enforce;
+import std.typecons : Tuple, tuple;
+import std.conv : to;
+
 import vibe.core.file;
 import vibe.core.path;
-
 import ddash.functional : cond;
 import sumtype : SumType, match;
 import requests : ReceiveAsRange, Request, Response;
 
-import std.exception: enforce;
-import std.typecons : Tuple, tuple;
+import scarpa : assertFail;
 
 /**
  * Functions related to disk I/O
@@ -126,7 +128,7 @@ void writeToFile(const Path fname, const FileContent content) @trusted
         return info.cond!(
             i => i.isDirectory, { return handleDirExists(path); },
             i => !i.isFile && !i.isDirectory, {
-                enforce(false, "Special file inside work directory: " ~ path.to!string);
+                return assertFail!Path("Special file inside work directory: " ~ path.to!string);
             },
             { return path; }
             );
@@ -176,8 +178,6 @@ FileContent requestUrl(const string url, bool isAsset) @trusted
     import std.utf;
 	import std.array : appender;
 	import std.algorithm.iteration : each;
-	import std.exception : enforce;
-	import std.conv : to;
 
 	typeof(return) ret;
 

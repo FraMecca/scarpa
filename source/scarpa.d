@@ -22,9 +22,17 @@ import std.algorithm.iteration : each, filter;
  * Allows to assert(false) inside a function that requires a return value;
  */
 template assertFail(T){
-	T assertFail(){
-		assert(false);
-	}
+    debug{
+        T assertFail(string msg=""){
+            assert(false, msg);
+        }
+    } else {
+        T assertFail(string msg=""){
+            import std.exception : enforce;
+            enforce(false, msg);
+            return T();
+        }
+    }
 }
 
 debug{
