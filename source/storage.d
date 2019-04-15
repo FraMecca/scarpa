@@ -148,7 +148,10 @@ bool isResolved(ref Database db, Event ev) @trusted
 
 void setResolved(ref Database db, Event ev) @trusted
 {
-	auto uuid = ev.uuid.get;
+    ev.match!((LogEvent l) { assert(false, "LogEvent should not be setResolved"); },
+              (_) {}
+    );
+    auto uuid = ev.uuid.get;
 
 	Statement statement = db.prepare(
 			"UPDATE Event
@@ -266,24 +269,26 @@ struct Storage {
 
 	void fire(Event ev) @trusted
 	{
-		ev.match!(
-			(LogEvent l) {},
-			(_) {
-					assert(!toSkip(ev));
-					db.insertEvent(ev);
-				}
-			);
+		ev.match!((LogEvent l) {},
+                  (_) {
+                      assert(!toSkip(ev));
+                      db.insertEvent(ev);
+                  }
+        );
 
 		immutable uuid = ev.uuid.get.toString;
 
 		auto go() {
-			auto results = ev.resolve;
-			db.setResolved(ev);
+			auto results = ev.resolve();
+            ev.match!((LogEvent l) {},
+                      (_) { db.setResolved(ev); }
+            );
 			mainTid.send(uuid);
 			return results;
 		}
 
 		auto task = async(&go);
+        assert(uuid !in tasks, "duplicate uuid generated");
 		tasks[uuid] = task;
 	}
 }

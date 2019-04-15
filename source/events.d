@@ -388,7 +388,7 @@ struct LogEvent {
 		m_reqTime = Clock.currTime();
 		m_requrl = requrl.parseURL;
 		m_payload = payload;
-        base = Base(ID(), md5UUID(m_requrl ~ "LOG"));
+        base = Base(ID(), md5UUID(m_reqTime.toSimpleString() ~ m_requrl ~ "LOG"));
 
 		// DATE TIME URL FILENAME:FILESIZE
 		// DATE TIME URL ERROR
@@ -411,10 +411,9 @@ struct LogEvent {
 	}
 
 	/// empty since no priority
-	const EventRange resolve() @trusted
+	const EventRange resolve() @safe
 	{
 		typeof(return) r;
-
 		return r;
 	}
 
