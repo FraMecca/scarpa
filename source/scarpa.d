@@ -63,8 +63,6 @@ void startProject()
     import std.range;
 	enableLogging(config.log, config.errorLog);
 
-	warning(config.projdir);
-
 	auto first = firstEvent(config.rootUrl);
 	auto storage = Storage(config.projdir ~ "/scarpa.db", first, thisTid);
 	auto maxEvents = config.maxEvents;

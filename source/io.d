@@ -176,6 +176,7 @@ alias FileContent = SumType!(FilePayload, HTMLPayload);
  */
 FileContent requestUrl(const string url, bool isAsset) @trusted
 {
+    // TODO: accept all certificates
     import parse : isHTMLFile;
     import config : config;
     import std.utf;
@@ -187,6 +188,7 @@ FileContent requestUrl(const string url, bool isAsset) @trusted
 	typeof(return) ret;
 
 	auto rq = Request();
+    // rq.verbosity = 2;
 	rq.useStreaming = true;
     rq.sslSetCaCert("/etc/ssl/cert.pem");
 	auto rs = rq.get(url);
@@ -216,7 +218,7 @@ FileContent requestUrl(const string url, bool isAsset) @trusted
 	} else {
 		auto fp = createTempFile();
 		rs.receiveAsRange.each!((buf) {
-            wait(buf);
+                wait(buf); // TODO why do we get destination already exists?
             fp.write(buf);
         });
 		ret = fp.path;

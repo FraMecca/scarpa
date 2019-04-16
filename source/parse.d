@@ -4,7 +4,7 @@ import scarpa;
 import config : config;
 import io;
 import logger;
-import url;
+import urllib;
 
 import ddash.functional : cond;
 import sumtype : match, SumType;

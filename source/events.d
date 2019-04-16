@@ -4,7 +4,7 @@ import parse;
 import io;
 import config : config;
 import logger;
-import url;
+import urllib;
 import scarpa : assertFail;
 
 import sumtype;
@@ -56,19 +56,19 @@ struct _Event{
 			},
             (inout RequestEvent _ev) {
                 auto j = JSONValue();
-                j["url"] = _ev.m_url.toString;
+                j["url"] = _ev.url.toString;
                 mixin(levelString);
                 return j;},
             (inout HTMLEvent _ev) {
                 auto j = JSONValue();
-                j["url"] = _ev.m_rooturl.toString;
+                j["url"] = _ev.url.toString;
                 mixin(levelString);
                 return j;
             },
             (inout ToFileEvent _ev) {
                 auto j = JSONValue();
                 j["fname"] = _ev.m_fname;
-                j["url"] = _ev.m_rooturl.toString;
+                j["url"] = _ev.url.toString;
                 mixin(levelString);
                 return j; 
             });
@@ -83,6 +83,15 @@ struct _Event{
             (const RequestEvent _ev) => _ev.parent,
             (const HTMLEvent _ev) => _ev.parent,
             (const ToFileEvent _ev) => _ev.parent);
+    }
+
+    @property const url() @safe
+    {
+        return ev.match!(
+            (const LogEvent _ev) => _ev.url,
+            (const RequestEvent _ev) => _ev.url,
+            (const HTMLEvent _ev) => _ev.url,
+            (const ToFileEvent _ev) => _ev.url);
     }
 
     const uuid() @safe
@@ -106,9 +115,10 @@ struct _Event{
             debug{
                 warning(e.info);
                 import std.conv : to;
-                return typeof(return).unexpected(e.file ~":"~e.line.to!string~" "~e.msg);
+
+                return typeof(return).unexpected(e.file ~":"~e.line.to!string~" "~url ~ ": " ~ e.msg);
             } else {
-                return typeof(return).unexpected(e.msg);
+                return typeof(return).unexpected(ev.url ~ ": " ~ e.msg);
             }
 		}
     }
@@ -158,31 +168,32 @@ private void append(E)(ref EventRange res, E e) @safe
 struct Base {
 	ID parent;
 	ID uuid;
+	immutable URL url;
 
-	this(const ID parent, const UUID uuid) @safe
+	this(const URL url, const ID parent, const UUID uuid) @safe
 	{
         this.parent = parent;
         this.uuid = uuid;
+        this.url = url.parseURL;
 	}
 
-	this(const UUID parent, const UUID uuid) @safe
+	this(const URL url, const UUID parent, const UUID uuid) @safe
 	{
         this.parent = parent;
         this.uuid = uuid;
+        this.url = url.parseURL;
 	}
 }
 
 struct RequestEvent {
 
-	immutable URL m_url;
     const Level m_level;
     const Base base;
     alias base this;
 
 	this(inout URL url, Level lev, const ID parent = ID()) @safe
 	{
-        base = Base(parent, md5UUID(url.toString ~ "REQUEST"));
-		m_url = url.parseURL;
+        base = Base(url.parseURL, parent, md5UUID(url.toString ~ "REQUEST"));
         m_level = lev;
 	}
 
@@ -201,14 +212,14 @@ struct RequestEvent {
 									  (Asset a) => true,
 									  (StopRecur d) => assertFail!bool);
 		try {
-			requestUrl(m_url.toString, isAsset).match!((const FilePayload stream) =>
-														res.append(ToFileEvent(stream, m_url, m_level, this.uuid)),
+			requestUrl(url.toString, isAsset).match!((const FilePayload stream) =>
+														res.append(ToFileEvent(stream, url, m_level, this.uuid)),
 												   (const HTMLPayload raw) =>
-														res.append(HTMLEvent(raw, m_url, m_level, this.uuid))
+														res.append(HTMLEvent(raw, url, m_level, this.uuid))
 												   );
 		} catch(Exception e) {
 			immutable LogPayload p = ErrorResult(e.msg);
-			res.append(LogEvent(m_url, p));
+			res.append(LogEvent(url, p));
 		}
 
 		assert(res.length == 1);
@@ -219,7 +230,7 @@ struct RequestEvent {
 	@property const string toString() @safe
 	{
         import std.conv : to;
-		return "RequestEvent(basedir: " ~ config.projdir ~ ", url: " ~ m_url ~
+		return "RequestEvent(basedir: " ~ config.projdir ~ ", url: " ~ url ~
             " level: "~ m_level.to!string ~ ")";
 	}
 }
@@ -227,7 +238,6 @@ struct RequestEvent {
 struct HTMLEvent {
 
 	const string m_content;
-	immutable URL m_rooturl;
     const Level m_level;
     const Base base;
     alias base this;
@@ -240,9 +250,8 @@ struct HTMLEvent {
 	///
 	this(const string content, const URL root, Level lev, const UUID parent) @safe
 	{
-        base = Base(parent, md5UUID(root ~ "HTML"));
+        base = Base(root.parseURL, parent, md5UUID(root ~ "HTML"));
 		m_content = content;
-		m_rooturl = root.parseURL;
         m_level = lev;
 	}
 
@@ -260,13 +269,13 @@ struct HTMLEvent {
         auto arrogante = Arrogant();
    		auto tree = arrogante.parse(m_content);
 
-        URLRule currentRule = findRule(m_rooturl, config.rules);
+        URLRule currentRule = findRule(url, config.rules);
 
 		foreach(kv; linkTags){
 			auto href = kv[0]; auto tag = kv[1];
 			foreach(ref node; tree.byTagName(tag)){
 				if(!node[href].isNull && node[href].get.isValidHref){
-					auto tup = url_and_path(node[href].get(), m_rooturl);
+					auto tup = url_and_path(node[href].get(), url);
 
 					m_level.match!((Asset a) {},
 								   (StopRecur d) {},
@@ -287,44 +296,41 @@ struct HTMLEvent {
 			}
 		}
 		string s = tree.document.innerHTML;
-		res.append(ToFileEvent(HTMLPayload(s), m_rooturl, m_level, this.parent));
+		res.append(ToFileEvent(HTMLPayload(s), url, m_level, this.parent));
 		return res;
 	}
 
 	///
 	@property const string toString() @safe
 	{
-		return "HTMLEvent(basedir: " ~ config.projdir ~ ", rooturl: " ~ m_rooturl ~")";
+		return "HTMLEvent(basedir: " ~ config.projdir ~ ", rooturl: " ~ url ~")";
 	}
 }
 
 struct ToFileEvent
 {
 	const FileContent m_content;
-    immutable URL m_rooturl;
     const string m_fname;
     const Level m_level;
     Base base;
     alias base this;
 
 	///
-	this(const FilePayload content, const URL url, Level level, const ID parent) @trusted
+	this(const FilePayload content, const URL uurl, Level level, const ID parent) @trusted
 	{
 		m_content = content;
-        m_rooturl = url.parseURL;
         m_level = level;
+        base = Base(uurl.parseURL, parent, md5UUID(uurl.toString ~ "FILE"));
 		m_fname = config.projdir ~ url.asPathOnDisk;
-        base = Base(parent, md5UUID(m_rooturl ~ "FILE"));
 	}
 
 	///
-	this(const HTMLPayload content, const URL url, Level level, const ID parent) @safe
+	this(const HTMLPayload content, const URL uurl, Level level, const ID parent) @safe
     {
             m_content = content;
             m_level = level;
-            m_rooturl = url.parseURL;
+            base = Base(uurl.parseURL, parent, md5UUID(m_fname ~ "FILE"));
             m_fname = config.projdir ~ url.asPathOnDisk;
-            base = Base(parent, md5UUID(m_fname ~ "FILE"));
         }
 
 	/**
@@ -343,19 +349,19 @@ struct ToFileEvent
             (const FilePayload r) {
                 if(config.checkFileAfterSave && isHTMLFile(fname)){
                     string content = readFromFile(fname);
-                    res.append(HTMLEvent(content, m_rooturl, m_level, uuid));
+                    res.append(HTMLEvent(content, url, m_level, uuid));
                 }
             }
         );
 		immutable LogPayload p = FileResult(m_fname, fsize);
-		res.append(LogEvent(m_rooturl, p));
+		res.append(LogEvent(url, p));
 
         return res;
 	}
 
 	@property const string toString() @safe
 	{
-		return "ToFileEvent(basedir: " ~ config.projdir ~ ", file: " ~ m_fname ~ " url:" ~ m_rooturl ~ ")";
+		return "ToFileEvent(basedir: " ~ config.projdir ~ ", file: " ~ m_fname ~ " url:" ~ url ~ ")";
 	}
 }
 
@@ -376,7 +382,6 @@ struct LogEvent {
 	import std.datetime.systime : SysTime, Clock;
 	import std.conv : to;
 
-    immutable URL m_requrl;
 	const SysTime m_reqTime;
 	const LogPayload m_payload;
     const Base base;
@@ -386,9 +391,8 @@ struct LogEvent {
 	this(const URL requrl, const LogPayload payload) @safe
 	{
 		m_reqTime = Clock.currTime();
-		m_requrl = requrl.parseURL;
 		m_payload = payload;
-        base = Base(ID(), md5UUID(m_reqTime.toSimpleString() ~ m_requrl ~ "LOG"));
+        base = Base(requrl.parseURL, ID(), md5UUID(m_reqTime.toSimpleString() ~ requrl ~ "LOG"));
 
 		// DATE TIME URL FILENAME:FILESIZE
 		// DATE TIME URL ERROR
@@ -403,7 +407,7 @@ struct LogEvent {
 					(ErrorResult e) => "\"" ~ e.code.to!string ~ "\""
 					)
 			~ " "
-			~ m_requrl.toString;
+			~ url.toString;
 
 		// log to logPath
 		info(res);
