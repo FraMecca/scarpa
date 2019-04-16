@@ -5,6 +5,7 @@ enum  WARNING = "\033[93m"; // yellow
 enum  ERROR = "\033[91m"; // red
 enum  END = "\033[0m";
 
+//TODO : what about scarpa.error.log?
 void enableLogging(const string logPath, const string errorPath)
 {
 
