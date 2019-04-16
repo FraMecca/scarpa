@@ -118,7 +118,7 @@ struct _Event{
 
                 return typeof(return).unexpected(e.file ~":"~e.line.to!string~" "~url ~ ": " ~ e.msg);
             } else {
-                return typeof(return).unexpected(ev.url ~ ": " ~ e.msg);
+                return typeof(return).unexpected(url ~ ": " ~ e.msg);
             }
 		}
     }
