@@ -78,12 +78,13 @@ alias segments = (inout string s) => s.split('/').filter!(i => i != "");
 string toFileName(const URL dst, const URL src) @safe
 in{
     assert(dst.fragment == "",  dst);
-// }out(results){writeln(results);
+ }out(results){version(unittest)writeln(results);
 }do{
     import std.range : walkLength, zip, repeat, take, tee;
     import std.array : array, join;
     import std.algorithm.iteration : map;
     import std.algorithm.searching : countUntil;
+    import std.path : extension;
 
     // is it the root of the website?
     if((dst.path == "/" || dst.path.empty)
@@ -113,8 +114,12 @@ in{
     return goUp ~ // file system hierarchy
         (sameHost ? "" : dst.host ~ "/") ~ // host
         dstments[splitLen..$].join("/") ~ // path
-		(dstpath == "" ? "index.html" : "") ~
-        (dstpath.endsWith("/") ? "/index.html" : ""); // index.html if it is a folder
+        dstpath.cond!("", "index.html",
+                      d => d.endsWith("/"), "/index.html",
+                      d => !d.extension.empty, "",
+                      ".html");
+// 		(dstpath == "" ? "index.html" : "") ~
+//         (dstpath.endsWith("/") ? "/index.html" : ""); // index.html if it is a folder
 }
 
 unittest{
@@ -123,7 +128,7 @@ unittest{
 	assert(toFileName("https://fragal.eu/b.html", "https://fragal.eu/a") == "../b.html");
 	assert(toFileName("https://fragal.eu/b.html", "https://fragal.eu/a/") == "../b.html");
 	assert(toFileName("https://fragal.eu/a/c/", "https://fragal.eu/a/b/") == "../c/index.html");
-	assert(toFileName("https://fragal.eu/a/c", "https://fragal.eu/a/b/") == "../c");
+	assert(toFileName("https://fragal.eu/a/c", "https://fragal.eu/a/b/") == "../c.html");
 	assert(toFileName("https://fragal.eu/c/d/", "https://fragal.eu/a/b/") == "../../c/d/index.html");
 	assert(toFileName("https://francescomecca.eu/A/c.html", "https://fragal.eu/a/b/") == "../../../francescomecca.eu/A/c.html");
 	assert(toFileName("https://fragal.eu/", "https://fragal.eu/") == "./index.html");
