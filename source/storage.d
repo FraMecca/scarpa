@@ -2,7 +2,7 @@ module storage;
 
 import events;
 import logger;
-import config : config;
+import arguments : config;
 import scarpa : assertFail;
 
 import d2sqlite3;

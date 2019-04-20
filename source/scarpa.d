@@ -5,18 +5,12 @@ debug {
 }
 
 import parse;
+import arguments;
 import io;
 import storage;
 import events;
 import logger;
-import config : config, parseCli, CLIResult, dumpExampleConfig;
 
-import vibe.core.concurrency;
-import vibe.core.task;
-import ddash.functional : cond;
-import ddash.utils : Expect, Unexpected, match;
-
-import std.algorithm.iteration : each, filter;
 
 /**
  * Allows to assert(false) inside a function that requires a return value;

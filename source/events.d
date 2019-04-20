@@ -1,10 +1,10 @@
 module events;
 
 import parse;
-import io;
-import config : config;
+import arguments : config;
 import logger;
 import urllib;
+import io;
 import scarpa : assertFail;
 
 import sumtype;

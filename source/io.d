@@ -178,7 +178,7 @@ FileContent requestUrl(const string url, bool isAsset) @trusted
 {
     // TODO: accept all certificates
     import parse : isHTMLFile;
-    import config : config;
+    import arguments : config;
     import std.utf;
 	import std.array : appender;
 	import std.algorithm.iteration : each;

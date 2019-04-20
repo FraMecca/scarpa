@@ -1,7 +1,7 @@
 module parse;
 
 import scarpa;
-import config : config;
+import arguments : config;
 import io;
 import logger;
 import urllib;
