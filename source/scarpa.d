@@ -38,24 +38,32 @@ debug{
 int main(string[] args)
 {
 	import std.stdio : writeln, stderr;
+    import sumtype : match;
 	int exitCode = 0;
 
-	parseCli(args).cond!(
-		CLIResult.HELP_WANTED, {},
-		CLIResult.ERROR, { exitCode = 2; },
-		CLIResult.EXAMPLE_CONF, { dumpExampleConfig(); },
-		CLIResult.NEW_PROJECT, { startProject(); },
-		CLIResult.RESUME_PROJECT, { writeln("Resume this project"); }, // TODO import data from db
-		CLIResult.NO_ARGS, { stderr.writeln("No arguments specified"); exitCode = 1; },
-		);
+	parseCli(args)
+        .match!((HELP_WANTED r) {},
+                (ARGS_ERROR r) { stderr.writeln(r.error); exitCode = 2; },
+                (EXAMPLE_CONF r) { dumpExampleConfig(); },
+                (NEW_PROJECT r) { startProject(); },
+                (RESUME_PROJECT r) { writeln("Resume this project"); }, // TODO import data from db
+                (NO_ARGS r) { stderr.writeln("No arguments specified"); exitCode = 1; }
+        );
 
-	return exitCode;
+    return exitCode;
 }
 
 void startProject()
 {
+    import std.algorithm.iteration : each, filter;
     import std.range;
-	enableLogging(config.log, config.errorLog);
+
+    import vibe.core.concurrency;
+    import vibe.core.task;
+    import ddash.functional : cond;
+    import ddash.utils : Expect, Unexpected, match;
+
+	enableLogging(config.log);
 
 	auto first = firstEvent(config.rootUrl);
 	auto storage = Storage(config.projdir ~ "/scarpa.db", first, thisTid);
