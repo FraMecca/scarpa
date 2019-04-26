@@ -226,3 +226,9 @@ FileContent requestUrl(const string url, bool isAsset) @trusted
 
 	return ret;
 }
+
+bool fileExists(const Path fp)
+{
+    import vibe.core.file : existsFile;
+    return existsFile(fp);
+}

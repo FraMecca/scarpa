@@ -315,25 +315,29 @@ struct ToFileEvent
     Base base;
     alias base this;
 
-	///
-	this(const FilePayload content, const URL uurl, Level level, const ID parent) @trusted
+    private this(const URL uurl, Level level, const ID parent) @safe
+    {
+        m_level = level;
+        base = Base(uurl.parseURL, parent, md5UUID(m_fname ~ "FILE"));
+		m_fname = config.projdir ~ url.asPathOnDisk;
+    }
+        
+
+    ///
+    this(const FilePayload content, const URL uurl, Level level, const ID parent) @trusted
 	{
 		m_content = content;
-        m_level = level;
-        base = Base(uurl.parseURL, parent, md5UUID(uurl.toString ~ "FILE"));
-		m_fname = config.projdir ~ url.asPathOnDisk;
-	}
+        this(uurl, level, parent);
+    }
 
-	///
+    ///
 	this(const HTMLPayload content, const URL uurl, Level level, const ID parent) @safe
     {
-            m_content = content;
-            m_level = level;
-            base = Base(uurl.parseURL, parent, md5UUID(m_fname ~ "FILE"));
-            m_fname = config.projdir ~ url.asPathOnDisk;
-        }
+        m_content = content;
+        this(uurl, level, parent);
+    }
 
-	/**
+    /**
 	 * Generate the appropriate folder structure and save the file.
 	 * Could check if the file is an HTML and could generate an HTML event.
 	 */
@@ -343,6 +347,9 @@ struct ToFileEvent
 
         auto fname = Path(m_fname);
 		fname.parentPath.makeDirRecursive();
+        assert(fname.fileExists, "file should exists already");
+
+        // write file to disk
         immutable fsize = fname.writeToFile(m_content);
         m_content.match!(
             (const HTMLPayload s) {},
@@ -353,8 +360,8 @@ struct ToFileEvent
                 }
             }
         );
-		immutable LogPayload p = FileResult(m_fname, fsize);
-		res.append(LogEvent(url, p));
+        immutable LogPayload p = FileResult(m_fname, fsize);
+        res.append(LogEvent(url, p));
 
         return res;
 	}
