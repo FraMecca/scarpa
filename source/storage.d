@@ -109,7 +109,6 @@ void insertEvent(ref Database db, Event e) @trusted
 bool testEvent(ref Database db, Event ev) @trusted
 {
 	auto uuid = ev.uuid.get;
-
 	Statement statement = db.prepare(
 			"SELECT EXISTS(SELECT 1
 				FROM Event
@@ -204,7 +203,7 @@ struct BinnedPQ {
 		ev.match!((RequestEvent e) => bins[EventType.RequestEvent] ~= makeEvent!e,
 				  (HTMLEvent e) => bins[EventType.HTMLEvent] ~= makeEvent!e,
 				  (inout ToFileEvent e) => bins[EventType.ToFileEvent] ~= makeEvent!e,
-				  (LogEvent e) => bins[EventType.LogEvent] ~= makeEvent!e
+				  (LogEvent e) => null //=> bins[EventType.LogEvent] ~= makeEvent!e
 		);
 	}
 
@@ -263,7 +262,7 @@ struct Storage {
 
 	void put(Event ev) @safe
 	{
-		if(toSkip(ev))  return;
+		if(toSkip(ev)) return;
 		queue.put(ev);
 	}
 
