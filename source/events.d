@@ -173,13 +173,17 @@ struct Base {
 	this(const URL url, const ID parent, const UUID uuid) @safe
 	{
         this.parent = parent;
-        this.uuid = uuid;
-        this.url = url.parseURL;
+        this(url, uuid);
 	}
 
 	this(const URL url, const UUID parent, const UUID uuid) @safe
 	{
         this.parent = parent;
+        this(url, uuid);
+    }
+
+    private this(const URL url, const UUID uuid) @safe
+    {
         this.uuid = uuid;
         this.url = url.parseURL;
 	}
