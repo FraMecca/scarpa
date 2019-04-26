@@ -112,13 +112,14 @@ struct _Event{
 					(inout HTMLEvent _ev) => _ev.resolve(),
 					(inout ToFileEvent _ev) => _ev.resolve()));
 		} catch (Exception e) {
+            immutable urlh = url.toHumanReadableString;
             debug{
                 warning(e.info);
                 import std.conv : to;
 
-                return typeof(return).unexpected(e.file ~":"~e.line.to!string~" "~url ~ ": " ~ e.msg);
+                return typeof(return).unexpected(e.file ~":"~e.line.to!string~" "~ urlh ~ ": " ~ e.msg);
             } else {
-                return typeof(return).unexpected(url ~ ": " ~ e.msg);
+                return typeof(return).unexpected(urlh ~ ": " ~ e.msg);
             }
 		}
     }
