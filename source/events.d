@@ -396,6 +396,7 @@ struct ToFileEvent
         debug{
             if(fname.fileExists){
                 info("[D] File exists: ", fname);
+                removeFile(m_content);
                 return res;
             }
         } else {

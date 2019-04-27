@@ -149,6 +149,20 @@ ulong writeToFile(const Path fname, const FileContent content) @trusted
 	return getFileInfo(dst).size;
 }
 
+debug{
+void removeFile(const FileContent content)
+{
+    import vibe.core.file : removeFile;
+    content.match!(
+        (const HTMLPayload s) {
+		},
+        (const FilePayload pt) {
+			removeFile(pt);
+		}
+    );
+}
+}
+
 /**
  * Read from File.
  */
