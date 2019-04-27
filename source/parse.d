@@ -120,8 +120,6 @@ in{
                       d => d.endsWith("/"), "/index.html",
                       d => !d.extension.empty, "",
                       ".html");
-// 		(dstpath == "" ? "index.html" : "") ~
-//         (dstpath.endsWith("/") ? "/index.html" : ""); // index.html if it is a folder
 }
 
 unittest{
