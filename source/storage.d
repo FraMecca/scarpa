@@ -263,8 +263,16 @@ struct Storage {
 	void put(Event ev) @safe
 	{
 		if(toSkip(ev)) return;
-		queue.put(ev);
-	}
+
+        queue.put(ev);
+        debug{
+            immutable t = ev.enumType;
+            immutable qln = t in queue.bins ? queue.bins[t].length : 0;
+            immutable ts = ev.typeString;
+            // info("[D] Put: ", ts, " - ", qln);
+        }
+
+    }
 
 	void fire(Event ev) @trusted
 	{

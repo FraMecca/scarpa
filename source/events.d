@@ -128,6 +128,24 @@ struct _Event{
 	{
 		return this.uuid.get.toString;
 	}
+
+    debug{
+    @property const enumType() @safe
+    {
+        return ev.match!((const LogEvent _ev) => EventType.LogEvent,
+                         (const RequestEvent _ev) => EventType.RequestEvent,
+                         (const HTMLEvent _ev) => EventType.HTMLEvent,
+                         (const ToFileEvent _ev) => EventType.ToFileEvent);
+    }
+
+    @property const typeString() @safe
+    {
+        return ev.match!((const LogEvent _ev) => "LogEvent",
+                         (const RequestEvent _ev) => "RequestEvent",
+                         (const HTMLEvent _ev) => "HTMLEvent",
+                         (const ToFileEvent _ev) => "ToFileEvent");
+    }
+    }
 }
 
 alias Event = immutable(_Event);
