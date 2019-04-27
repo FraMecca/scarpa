@@ -93,6 +93,8 @@ private URLRule[] loadRules(const string path) @trusted
 
     URLRule[] rules;
 
+    // TODO: make aliases for SUBDOMAIN and DOMAIN
+
     auto globalRule = URLRule(".*", 0, true); /// catch-all rule, always at the end
     foreach(val ; root.tags().filter!(s => s.getFullName.name == "rule")){
         auto urlst = val.getValue!string;
