@@ -396,7 +396,7 @@ pure:
 	}
 
 	/// Implicitly convert URLs to strings.
-	// alias toString this; // TFW, REMOVED
+	alias toString this;
 
     /**
       Compare two URLs.
@@ -1133,7 +1133,7 @@ unittest
 {
 	import std.net.curl;
 	auto url = "http://example.org".parseURL;
-	assert(is(typeof(std.net.curl.get(url.toString))));
+	assert(is(typeof(std.net.curl.get(url))));
 }
 
 /**
@@ -1148,9 +1148,6 @@ URL parseURL(string value) {
 		return url;
 	}
 	throw new URLException("failed to parse URL " ~ value);
-}
-inout(URL) parseURL(inout URL value) {
-    return value;
 }
 
 ///

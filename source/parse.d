@@ -57,11 +57,10 @@ in{
 }
 do{
     string dst;
-    import std.algorithm.searching : canFind;
     URL src;
     // write full path in case of relative urls
     if(url.startsWith("/")){
-        src = absRooturl.immutableURL;
+        src = absRooturl.parseURL;
         src.path = url.removeAnchor;
     } else {
         src = url.removeAnchor.parseURL;
@@ -71,7 +70,6 @@ do{
     return parseResult(src, dst);
 }
 
-alias immutableURL = (inout URL u) => u.toString.parseURL; // TODO, FIXME?
 alias segments = (inout string s) => s.split('/').filter!(i => i != "");
 /**
  * Converts an URL to a path on the disk
@@ -79,7 +77,7 @@ alias segments = (inout string s) => s.split('/').filter!(i => i != "");
  */
 string toFileName(const URL dst, const URL src) @safe
 in{
-    assert(dst.fragment == "",  dst.toHumanReadableString);
+    assert(dst.fragment == "",  dst);
  }out(results){version(unittest)writeln(results);
 }do{
     import std.range : walkLength, zip, repeat, take, tee;
