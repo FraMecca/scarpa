@@ -289,34 +289,57 @@ struct HTMLEvent {
         import arrogant;
 
 		EventRange res;
+        URLRule currentRule = findRule(url, config.rules);
+
+        string replaceUrl(const string href, const string tag, ref Node node){ 
+            auto tup = url_and_path(node[href].get(), url);
+
+            m_level.match!((Asset a) {},
+                           (StopRecur d) {},
+                           (int n) {
+                               immutable level = couldRecur(tup.url, n, currentRule, tag, node); // new level
+                                   level.match!((int l){
+                                           res.append(RequestEvent(tup.url, level, this.parent));
+                                       },
+                                   (Asset a){
+                                       res.append(RequestEvent(tup.url, level, this.parent));
+                                   },
+                                   (StopRecur d) {}
+                                );
+                           });
+            return tup.fname;
+        }
+
+        bool commentOut(const string tag, ref Node node)
+        // out(res){ debug{ writeln(res, " ", tag); }} do
+        {
+            // there are links such as dns-prefetch
+            // that are useful to full fledged browser but
+            // dangerous or unused when reading offline
+            // such tags are preserved but commented
+
+            if(tag != "link") return false;
+            if(node["rel"].isNull) return true;
+            immutable rel = node["rel"];
+            if(rel != "stylesheet" || rel != "icon") return true;
+
+            return false;
+        }
 
         auto arrogante = Arrogant();
    		auto tree = arrogante.parse(m_content);
 
-        URLRule currentRule = findRule(url, config.rules);
-
 		foreach(kv; linkTags){
 			auto href = kv[0]; auto tag = kv[1];
 			foreach(ref node; tree.byTagName(tag)){
-				if(!node[href].isNull && node[href].get.isValidHref){
-					auto tup = url_and_path(node[href].get(), url);
-
-					m_level.match!((Asset a) {},
-								   (StopRecur d) {},
-								   (int n) {
-									   auto level = couldRecur(tup.url, n, currentRule, tag, node);
-									   level.match!((int l){
-											   res.append(RequestEvent(tup.url, level, this.parent));
-										   },
-													(Asset a){
-														res.append(RequestEvent(tup.url, level, this.parent));
-													},
-													(StopRecur d) {}
-										   );
-						});
-
-					node[href] = tup.fname; // replace with a filename on disk
-				}
+                node[href] = node.cond!(
+                    // see function body
+                    n => commentOut(tag, n), n => "<!-- " ~ n.innerHTML ~ " -->",
+                    // proper url to fetch
+                    n => !n[href].isNull && n[href].get.isValidHref, n => replaceUrl(href, tag, n),
+                    // do not replace
+                    n => n.innerHTML 
+                );
 			}
 		}
 		string s = tree.document.innerHTML;
