@@ -372,7 +372,14 @@ struct ToFileEvent
 
         auto fname = Path(m_fname);
 		fname.parentPath.makeDirRecursive();
-        assert(!fname.fileExists, "file should not exists already");
+        debug{
+            if(fname.fileExists){
+                info("[D] File exists: ", fname);
+                return res;
+            }
+        } else {
+            assert(!fname.fileExists, "file should not exists already");
+        }
 
         // write file to disk
         immutable fsize = fname.writeToFile(m_content);
