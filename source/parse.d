@@ -147,10 +147,10 @@ unittest{
 string asPathOnDisk(const URL url) @safe
 {
     // is it the root of the website?
-    if(url.path == "/" || url.path.empty)
+    if(url.path.empty)
         return url.host ~ "/index.html";
-
-    return url.host ~ url.path ~ (url.path.endsWith("/") ? "index.html" : "");
+    else
+        return url.host ~ url.path ~ (url.path.endsWith("/") ? "index.html" : "");
 }
 
 unittest{
