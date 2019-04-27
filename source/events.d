@@ -189,22 +189,22 @@ struct Base {
 	ID uuid;
 	immutable URL url;
 
-	this(const URL url, const ID parent, const UUID uuid) @safe
+	this(inout URL url, const ID parent, const UUID uuid) @safe
 	{
         this.parent = parent;
         this(url, uuid);
 	}
 
-	this(const URL url, const UUID parent, const UUID uuid) @safe
+	this(inout URL url, const UUID parent, const UUID uuid) @safe
 	{
         this.parent = parent;
         this(url, uuid);
     }
 
-    private this(const URL url, const UUID uuid) @safe
+    private this(inout URL url, const UUID uuid) @safe
     {
         this.uuid = uuid;
-        this.url = url.parseURL;
+        this.url = url.toString.parseURL;
 	}
 }
 
@@ -253,7 +253,8 @@ struct RequestEvent {
 	@property const string toString() @safe
 	{
         import std.conv : to;
-		return "RequestEvent(basedir: " ~ config.projdir ~ ", url: " ~ url ~
+		return "RequestEvent(basedir: " ~ config.projdir ~ ", url: " ~
+            url.toHumanReadableString ~
             " level: "~ m_level.to!string ~ ")";
 	}
 }
@@ -273,7 +274,7 @@ struct HTMLEvent {
 	///
 	this(const string content, const URL root, Level lev, const UUID parent) @safe
 	{
-        base = Base(root.parseURL, parent, md5UUID(root ~ "HTML"));
+        base = Base(root, parent, md5UUID(root.toString ~ "HTML"));
 		m_content = content;
         m_level = lev;
 	}
@@ -326,7 +327,8 @@ struct HTMLEvent {
 	///
 	@property const string toString() @safe
 	{
-		return "HTMLEvent(basedir: " ~ config.projdir ~ ", rooturl: " ~ url ~")";
+		return "HTMLEvent(basedir: " ~ config.projdir ~ ", rooturl: " ~
+            url.toHumanReadableString ~")";
 	}
 }
 
@@ -341,10 +343,10 @@ struct ToFileEvent
     private this(const URL uurl, Level level, const ID parent) @safe
     {
         m_level = level;
+		m_fname = config.projdir ~ uurl.asPathOnDisk;
         base = Base(uurl.parseURL, parent, md5UUID(m_fname ~ "FILE"));
-		m_fname = config.projdir ~ url.asPathOnDisk;
+        info(m_fname, " ", base.uuid);
     }
-        
 
     ///
     this(const FilePayload content, const URL uurl, Level level, const ID parent) @trusted
@@ -391,7 +393,8 @@ struct ToFileEvent
 
 	@property const string toString() @safe
 	{
-		return "ToFileEvent(basedir: " ~ config.projdir ~ ", file: " ~ m_fname ~ " url:" ~ url ~ ")";
+		return "ToFileEvent(basedir: " ~ config.projdir ~ ", file: " ~ m_fname ~
+            " url:" ~ url.toHumanReadableString ~ ")";
 	}
 }
 
@@ -422,7 +425,7 @@ struct LogEvent {
 	{
 		m_reqTime = Clock.currTime();
 		m_payload = payload;
-        base = Base(requrl.parseURL, ID(), md5UUID(m_reqTime.toSimpleString() ~ requrl ~ "LOG"));
+        base = Base(requrl, ID(), md5UUID(m_reqTime.toSimpleString() ~ requrl.toString ~ "LOG"));
 
 		// DATE TIME URL FILENAME:FILESIZE
 		// DATE TIME URL ERROR
