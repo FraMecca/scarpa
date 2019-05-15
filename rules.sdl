@@ -1,0 +1,7 @@
+rootUrl "http://erbacce.org"
+maxResSize 8388608
+
+rule "erbacce.org" 3 regex=true
+rule ".*" 1 regex=true
+
+checkfileaftersave true
