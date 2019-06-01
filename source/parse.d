@@ -223,23 +223,20 @@ bool isHTMLFile(Path path) @safe
 struct URLRule{
     import std.array : array;
 
-    URL url;
+    SumType!(URL, Regex!char) rule;
     long level;
-    Regex!char rgx;
-    bool isRegex;
     bool isRelative; // url does not start with http[s]
     ulong length;
     string[] segment;
-    alias url this;
 
-    this(inout string ur, inout long lev, bool isRgx) @safe {
+    this(const string ur, inout long lev, bool isRgx) @safe {
         import std.string : startsWith;
-        url = ur.parseURL;
+        isRgx.cond!(true, { rule = regex(ur); },
+                    false, { rule = ur.parseURL; });
         level = lev;
-        rgx = regex(url.host);
-        segment = url.path.segments.array;
+        segment = rule.match!((URL u) => u.path.segments.array,
+                              (Regex!char r) => null);
         length = segment.length;
-        isRegex = isRgx;
         ur.cond!(
             u => u.startsWith("http://"), { isRelative = false; },
             u => u.startsWith("https://"), { isRelative = false; },
@@ -247,11 +244,30 @@ struct URLRule{
         );
     }
 
-    bool matches(const URL url) @safe
+    const int providedPort() @safe
+    {
+        return rule.match!((inout URL u) => u.providedPort,
+                           (_) => 0);
+    }
+
+    const int port() @safe
+    {
+        return rule.match!((inout URL u) => u.port,
+                           (_) => 0);
+    }
+
+    string host() @safe
+    {
+        return rule.match!((inout URL u) => u.host,
+                           (_) => assertFail!string("was a regex type"));
+    }
+
+    const bool matches(const URL url) @safe
     {
         import std.regex : matchFirst;
-        return ((isRegex && url.host.matchFirst(this.rgx)) || url.host == this.host) &&
-            (isRelative || (url.scheme == this.scheme && this.port == url.port));
+        return rule.match!((inout URL u)  { return url.host == u.host &&
+                    (isRelative || (url.scheme == u.scheme && u.port == url.port)); },
+            (inout Regex!char rgx) => !!url.toString.matchFirst(rgx));
     }
 }
 
@@ -260,13 +276,10 @@ struct URLRule{
  */
 bool checkLevel(const URLRule rhs, const URL lhs, int currentLev = 0) @safe
 {
-    import std.regex : matchFirst;
-
     auto lrg = lhs.path.split('/').filter!(i => i != ""); // skips http[s]
     long ldiff = lrg.walkLength - rhs.segment.length;
 
-    return
-        (!rhs.isRegex || lhs.host.matchFirst(rhs.rgx)) &&
+    return rhs.matches(lhs) &&
         (rhs.providedPort == 0 || lhs.port == rhs.port) &&
         (lhs.scheme == "http" || lhs.scheme == "https") &&
         ldiff <= rhs.level - currentLev;
@@ -295,13 +308,13 @@ unittest{
     assert(!checkLevel("http://fragal.eu:80/", "http://fragal.eu:80/a/b/c", 1, false));
     assert(checkLevel("http://fragal.eu:80", "http://fragal.eu:80/", 1, false));
     assert(checkLevel("fragal.eu:80", "http://fragal.eu:80/", 1, false));
-    assert(checkLevel("http://.*.eu:80", "fragal.eu:80", 1, true));
+    // TODO do we really want to test regexes and ports?
+    // assert(checkLevel("http://.*.eu:80", "fragal.eu:80", 1, true));
     assert(checkLevel("http://.*", "fragal.eu:80", 1, true));
     assert(!checkLevel("http://.*/", "fragal.eu:80/git", 0, true));
     assert(!checkLevel("http://.*.fragal.eu:80/", "http://fragal.eu:80/git", 0, true));
-    assert(!checkLevel("http://.*.eu:80", "fragal.eu:80/git", 0, true));
-    assert(checkLevel("http://.*.eu:80", "fragal.eu:80/git", 1, true));
-    assert(checkLevel(".*.fragal.eu:80", "http://git.fragal.eu:80", 1, true));
+    assert(checkLevel("http://.*.eu", "fragal.eu:80/git", 1, true));
+    assert(checkLevel(".*.fragal.eu", "http://git.fragal.eu:80", 1, true));
 }
 
 /**
