@@ -203,8 +203,8 @@ struct Base {
 
     private this(const URL url, const UUID uuid) @safe
     {
-        this.uuid = uuid;
-        this.url = url.parseURL;
+        this.uuid = uuid; 
+        this.url = url.toString.parseURL; // TODO resolve, maybe copy
 	}
 }
 
@@ -216,7 +216,7 @@ struct RequestEvent {
 
 	this(inout URL url, Level lev, const ID parent = ID()) @safe
 	{
-        base = Base(url.parseURL, parent, md5UUID(url.toString ~ "REQUEST"));
+        base = Base(url, parent, md5UUID(url.toString ~ "REQUEST"));
         m_level = lev;
 	}
 
@@ -235,7 +235,7 @@ struct RequestEvent {
 									  (Asset a) => true,
 									  (StopRecur d) => assertFail!bool);
 		try {
-			requestUrl(url.toString, isAsset).match!((const FilePayload stream) =>
+			requestUrl(url, isAsset).match!((const FilePayload stream) =>
 														res.append(ToFileEvent(stream, url, m_level, this.uuid)),
 												   (const HTMLPayload raw) =>
 														res.append(HTMLEvent(raw, url, m_level, this.uuid))
@@ -253,7 +253,8 @@ struct RequestEvent {
 	@property const string toString() @safe
 	{
         import std.conv : to;
-		return "RequestEvent(basedir: " ~ config.projdir ~ ", url: " ~ url ~
+		return "RequestEvent(basedir: " ~ config.projdir ~ ", url: "
+            ~ url.toHumanReadableString ~
             " level: "~ m_level.to!string ~ ")";
 	}
 }
@@ -273,7 +274,7 @@ struct HTMLEvent {
 	///
 	this(const string content, const URL root, Level lev, const UUID parent) @safe
 	{
-        base = Base(root.parseURL, parent, md5UUID(root ~ "HTML"));
+        base = Base(root, parent, md5UUID(root.toString~ "HTML"));
 		m_content = content;
         m_level = lev;
 	}
@@ -290,7 +291,7 @@ struct HTMLEvent {
 		EventRange res;
         URLRule currentRule = findRule(url, config.rules);
 
-        string replaceUrl(const string href, const string tag, ref Node node){ 
+        string replaceUrl(const string href, const string tag, ref Node node){
             auto tup = url_and_path(node[href].get(), url);
 
             m_level.match!((Asset a) {},
@@ -349,7 +350,8 @@ struct HTMLEvent {
 	///
 	@property const string toString() @safe
 	{
-		return "HTMLEvent(basedir: " ~ config.projdir ~ ", rooturl: " ~ url ~")";
+		return "HTMLEvent(basedir: " ~ config.projdir ~ ", rooturl: "
+            ~ url.toHumanReadableString ~")";
 	}
 }
 
@@ -361,11 +363,11 @@ struct ToFileEvent
     Base base;
     alias base this;
 
-    private this(const URL uurl, Level level, const ID parent) @safe
+    private this(const URL _url, Level level, const ID parent) @safe
     {
         m_level = level;
-        base = Base(uurl.parseURL, parent, md5UUID(m_fname ~ "FILE"));
-		m_fname = config.projdir ~ url.asPathOnDisk;
+		m_fname = config.projdir ~ _url.asPathOnDisk;
+        base = Base(_url, parent, md5UUID(m_fname ~ "FILE"));
     }
         
 
@@ -422,7 +424,8 @@ struct ToFileEvent
 
 	@property const string toString() @safe
 	{
-		return "ToFileEvent(basedir: " ~ config.projdir ~ ", file: " ~ m_fname ~ " url:" ~ url ~ ")";
+		return "ToFileEvent(basedir: " ~ config.projdir ~ ", file: " ~ m_fname
+            ~ " url:" ~ url.toHumanReadableString ~ ")";
 	}
 }
 
@@ -453,7 +456,7 @@ struct LogEvent {
 	{
 		m_reqTime = Clock.currTime();
 		m_payload = payload;
-        base = Base(requrl.parseURL, ID(), md5UUID(m_reqTime.toSimpleString() ~ requrl ~ "LOG"));
+        base = Base(requrl, ID(), md5UUID(m_reqTime.toSimpleString() ~ requrl.toHumanReadableString ~ "LOG"));
 
 		// DATE TIME URL FILENAME:FILESIZE
 		// DATE TIME URL ERROR

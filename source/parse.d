@@ -40,6 +40,12 @@ version(unittest) {
 	{
 		return toFileName(url.parseURL, src.parseURL);
 	}
+
+    string removeAnchor(const string url)
+        out(result){writeln(result);}do
+    {
+        return removeAnchor(url.parseURL).toHumanReadableString;
+    }
 }
 
 
@@ -50,7 +56,7 @@ alias parseResult = tuple!("url", "fname");
  * Parse an URL and
  * return a tuple of URL, pathname
  */
-ParseResult url_and_path(const string url, const URL absRooturl) @safe
+ParseResult url_and_path(const string url, const URL absRooturl) @safe pure
 in{
     assert(url.startsWith("http://") || url.startsWith("https://") || url.startsWith("/"), url);
     assert(absRooturl.fragment == "");
@@ -60,11 +66,12 @@ do{
     URL src;
     // write full path in case of relative urls
     if(url.startsWith("/")){
-        src = absRooturl.parseURL;
-        src.path = url.removeAnchor;
+        src = absRooturl.toString.parseURL;
+        src.path = url;
     } else {
-        src = url.removeAnchor.parseURL;
+        src = url.parseURL;
     }
+    src = src.removeAnchor;
 
 	dst = toFileName(src, absRooturl);
     return parseResult(src, dst);
@@ -75,10 +82,9 @@ alias segments = (inout string s) => s.split('/').filter!(i => i != "");
  * Converts an URL to a path on the disk
  * relatively to the source that points to the URL
  */
-string toFileName(const URL dst, const URL src) @safe
+string toFileName(const URL dst, const URL src) @safe pure
 in{
-    assert(dst.fragment == "",  dst);
- }out(results){version(unittest)writeln(results);
+    assert(dst.fragment == "",  dst.toHumanReadableString);
 }do{
     import std.range : walkLength, zip, repeat, take, tee;
     import std.array : array, join;
@@ -140,7 +146,7 @@ unittest{
  * supposing the project directory as root
  * The return does not contain the project directory.
  */
-string asPathOnDisk(const URL url) @safe
+string asPathOnDisk(const URL url) @safe pure
 {
     // is it the root of the website?
     if(url.path.empty)
@@ -165,40 +171,36 @@ unittest{
  * the same html page referring to one of its div.
  * This function strips the '#'
  */
-string removeAnchor(const string src) @safe
+URL removeAnchor(const URL src) @safe pure
 {
-    auto idx = src.lastIndexOf('#');
-    if(idx < 0) return src;
-    else return src[0 .. idx];
+    auto n = src.toString.parseURL; // understand how to get around this TODO
+    n.fragment = null;
+    return n;
 }
 
 unittest{
     assert("http://example.com/p#anchor".removeAnchor == "http://example.com/p");
     assert("http://example.com/p#anchor/".removeAnchor == "http://example.com/p");
     assert("http://example.com/#anchor".removeAnchor == "http://example.com/");
-    assert("#anchor".removeAnchor == "");
-    assert("#".removeAnchor == "");
 }
 
 /**
    Different value checks for valid href url
 */
-bool isValidHref(const string href) @safe
+bool isValidHref(const string href) @safe pure
 {
-    return href.cond!(
-        h => h.removeAnchor == "", false,
-        h => h.startsWith("/"), true,
-        h => h.startsWith("http://"), true,
-        h => h.startsWith("https://"), true,
-        false
-    );
+    return href.cond!(h => h.startsWith("#"), false,
+                      h => h.startsWith("/"), true,
+                      h => h.startsWith("http://"), true,
+                      h => h.startsWith("https://"), true,
+                      false);
 }
 
 /**
  * Parse the HTTP headers
  * and return true if we are dealing with an HTML file
  */
-bool isHTMLFile(string[string] headers) @safe
+bool isHTMLFile(string[string] headers) @safe pure
 {
 	return /*"content-length" in headers &&*/ // TODO investigate
 			//headers["content-length"].to!ulong < config.maxResSize &&
@@ -211,7 +213,7 @@ bool isHTMLFile(string[string] headers) @safe
  * Parse the header of a file on disk using libmagic
  * and return true if we are dealing with an HTML file
  */
-bool isHTMLFile(Path path) @safe
+bool isHTMLFile(Path path) @safe pure
 {
     import magic;
 	return path.toString.magicType.startsWith("text/html");

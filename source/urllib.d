@@ -1,8 +1,4 @@
 /**
- * This module was downloaded from https://github.com/dhasenan/urld
- * and used while removing the URLException throw when it parses and illegal character.
- */
-/**
 	* A URL handling library.
 	*
 	* URLs are Unique Resource Locators. They consist of a scheme and a host, with some optional
@@ -112,7 +108,7 @@ enum ushort[string] schemeToDefaultPort = [
 	*/
 struct QueryParams
 {
-    hash_t toHash() const nothrow @safe
+    hash_t toHash() const nothrow
     {
         return typeid(params).getHash(&params);
     }
@@ -127,7 +123,7 @@ pure:
     }
 
     /// Get a range over the query parameter values for the given key.
-    auto opIndex(string key) const
+    auto opIndex(string key) const @safe
     {
         import std.algorithm.searching : find;
         import std.algorithm.iteration : map;
@@ -226,8 +222,7 @@ pure:
 	*/
 struct URL
 {
-    hash_t toHash() const @safe nothrow
-    {
+    hash_t toHash() const @safe nothrow {
         return asTuple().toHash();
     }
 
@@ -396,7 +391,7 @@ pure:
 	}
 
 	/// Implicitly convert URLs to strings.
-	alias toString this;
+	// alias toString this;
 
     /**
       Compare two URLs.
@@ -1133,7 +1128,7 @@ unittest
 {
 	import std.net.curl;
 	auto url = "http://example.org".parseURL;
-	assert(is(typeof(std.net.curl.get(url))));
+	// assert(is(typeof(std.net.curl.get(url)))); // does not pass if no implicit conversion
 }
 
 /**
@@ -1433,12 +1428,12 @@ private string toPuny(string unicodeHostname)
 			mustEncode = true;
 			break;
 		}
-		// if (c < 0x2C || (c >= 0x3A && c <= 40) || (c >= 0x5B && c <= 0x60) || (c >= 0x7B)) {
-		// 	throw new URLException(
-		// 			format(
-		// 				"domain name '%s' contains illegal character '%s' at position %s",
-		// 				unicodeHostname, d, i));
-		// }
+		if (c < 0x2C || (c >= 0x3A && c <= 40) || (c >= 0x5B && c <= 0x60) || (c >= 0x7B)) {
+			throw new URLException(
+					format(
+						"domain name '%s' contains illegal character '%s' at position %s",
+						unicodeHostname, d, i));
+		}
 	}
 	if (!mustEncode) {
 		return unicodeHostname;

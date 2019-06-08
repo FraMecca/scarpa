@@ -188,7 +188,8 @@ alias FileContent = SumType!(FilePayload, HTMLPayload);
  * Either fetch the entire content as a string if it is an HTML page
  * or return an OutputRange containing binary data
  */
-FileContent requestUrl(const string url, bool isAsset) @trusted
+import urllib;
+FileContent requestUrl(const URL url, bool isAsset) @trusted
 {
     // TODO: accept all certificates
     import parse : isHTMLFile;
@@ -205,7 +206,10 @@ FileContent requestUrl(const string url, bool isAsset) @trusted
     // rq.verbosity = 2;
 	rq.useStreaming = true;
     rq.sslSetCaCert("/etc/ssl/cert.pem");
-	auto rs = rq.get(url);
+
+    import std.stdio;
+    auto reqUrl = url.toString.percentDecode; // TODO maybe percentDecode not needed
+	auto rs = rq.get(reqUrl);
 	auto resBody = appender!string;
 
 	enforce(rs.code < 400, "HTTP Response: " ~ rs.code.to!string);

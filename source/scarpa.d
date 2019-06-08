@@ -11,6 +11,7 @@ import storage;
 import events;
 import logger;
 
+// TODO: user agent
 
 /**
  * Allows to assert(false) inside a function that requires a return value;

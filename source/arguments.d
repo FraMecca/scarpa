@@ -44,6 +44,12 @@ struct Config {
     string log = "scarpa.log";
     @cli("rules|r") @cfg("rules")
     string ruleFile = "rules.sdl";
+    @cli("url-all") @cfg("all")
+    long allUrlsRule = 0;
+    @cli("url-domain") @cfg("domain")
+    long domainRule = 0;
+    @cli("url-subdomain") @cfg("subdomain")
+    long subdomainRule = 0;
 
     URLRule[] rules;
     CLIResult action;

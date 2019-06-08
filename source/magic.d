@@ -2,6 +2,8 @@
 import std.string: toStringz;
 import std.exception : enforce;
 
+pure:
+
 string magicType(const string path) @trusted
 {
 	char[32] dst;
