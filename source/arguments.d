@@ -60,72 +60,128 @@ struct Config {
     {
         import std.path : isAbsolute, asAbsolutePath;
         import std.array : array;
-        if(projdir == "" || projdir.empty){
-            action = ARGS_ERROR("Must get a valid project directory");
+
+        if (resume && !init) {
+            action = RESUME_PROJECT();
+		} else if(resume && init) {
+			action = ARGS_ERROR("Cannot init a non-empty project");
         } else {
-            try{
-                rules = loadRules(ruleFile);
-            } catch(Exception e){
-                action = ARGS_ERROR("Can't read rule file.");
-            }
+            action = NEW_PROJECT();
         }
 
-        if (resume) {
-            action = RESUME_PROJECT();
+		if(init) {
+			immutable cfile = projdir ~ "scarpa.cfg";
+			immutable rls = projdir ~ "rules.sdl";
+
+            if(rootUrl.empty)
+                action = ARGS_ERROR("Specify root url");
+            else if(Path(cfile).fileExists) 
+                action = ARGS_ERROR("Configuration file already present");
+            else if(Path(rls).fileExists) 
+                action = ARGS_ERROR("Rules file already present");
+            else
+                action = DUMP_CONF();
+			return;
+		}
+
+        if(rootUrl.empty) {
+			action = ARGS_ERROR("Invalid root URL");
+			return;
+		}
+
+        if(projdir == "" || projdir.empty) {
+            action = ARGS_ERROR("Must get a valid project directory");
 
         } else {
-            // sanity checks
             if(!projdir.isAbsolute)
                 projdir = projdir.asAbsolutePath.array;
             if(!projdir.endsWith("/"))
                 projdir ~= "/";
 
-            action = NEW_PROJECT();
+			immutable _rules = ruleFile.cond!(
+					r => r.isAbsolute, r => r,
+					r => projdir ~ r
+					);
+
+			try{
+				enforce(!_rules.empty, "Rule file cannot be empty");
+				enforce(Path(_rules).fileExists, "Rule file does not exist: " ~ _rules);
+				rules = loadRules(_rules);
+
+			} catch(Exception e){
+				action = ARGS_ERROR("Can't read rule file: " ~ _rules);
+			}
         }
-        if(projdir.empty) action = ARGS_ERROR("invalid project directory");
-        if(rootUrl.empty) action = ARGS_ERROR("invalid root URL");
-        if(rules.empty) action = ARGS_ERROR("No rules specified");
     }
+
+	/** Reads a file in "path" containing URL rules
+	  * in regex or literal format.
+	  * Path is set from projdir~ruleFile in struct Config.
+	*/
+	private URLRule[] loadRules(const string path) @trusted
+	{
+		import std.algorithm.iteration : filter;
+		import std.file : readText;
+
+		URLRule[] rules;
+
+		auto globalRule = URLRule(".*", 0, true); /// catch-all rule, always at the end
+
+		if(!path.empty) {
+			auto dst = readText(path);
+			auto root = parseSource(dst);
+
+			foreach(val ; root.tags().filter!(s => s.getFullName.name == "rule")){
+				auto urlst = val.getValue!string;
+				auto lev = val.getValue!int;
+				if(urlst == ".*"){
+					globalRule = URLRule(urlst, lev, true);
+					continue;
+				}
+				auto isRegex = !val.getAttribute!bool("literal") || val.getAttribute!bool("regex");
+				rules ~= URLRule(urlst, lev, isRegex);
+			}
+		}
+
+		rules ~= globalRule; // always at the end
+
+		return rules;
+	}
+
+}
+
+/** Dump default config files in projdir
+ * rules.sdl
+ * scarpa.cfg (key-value)
+ */
+void dumpInitConfig() @trusted// TODO
+{
+	// dump projdir/scarpa.cfg
+	string cfile;
+	// TODO finish (how do function as UDAs work is still a mistery)
+	static foreach(opt; __traits(allMembers, Config)) {
+		mixin("foreach(attr; __traits(getAttributes, _config."~opt~")) {
+					if(attr.stringof.canFind(\"CFG\"))
+						cfile ~= \""~opt~"\" ~ \" = \" ~ to!string(_config."~opt~") ~ \"\n\";
+				}");
+	}
+
+	writeFile(Path(_config.projdir ~ "/" ~ "scarpa.cfg"), cast(immutable(ubyte)[])cfile);
+
+	// dump projdir/rules.sdl
+	URL root = _config.rootUrl.parseURL;
+	string rules = "rule \""~root.host~"/*\" 5 regex=true\n";
+	rules ~= "rule \".*."~root.host~"/*\" 1 regex=true\n";
+	rules ~= "rule \".*\" 0 regex=true\n";
+
+	writeFile(Path(_config.projdir ~ "/" ~ "rules.sdl"), cast(immutable(ubyte)[])rules);
 }
 
 __gshared Config _config;
 
-private URLRule[] loadRules(const string path) @trusted
-{
-    import std.algorithm.iteration : filter;
-    import std.file : readText;
-
-    auto dst = readText(path);
-	auto root = parseSource(dst);
-
-    URLRule[] rules;
-
-    // TODO: make aliases for SUBDOMAIN and DOMAIN
-
-    auto globalRule = URLRule(".*", 0, true); /// catch-all rule, always at the end
-    foreach(val ; root.tags().filter!(s => s.getFullName.name == "rule")){
-        auto urlst = val.getValue!string;
-        auto lev = val.getValue!int;
-        if(urlst == ".*"){
-            globalRule = URLRule(urlst, lev, true);
-            continue;
-        }
-        auto isRegex = !val.getAttribute!bool("literal") || val.getAttribute!bool("regex");
-        rules ~= URLRule(urlst, lev, isRegex);
-    }
-    rules ~= globalRule; // always at the end
-
-    return rules;
-}
-
 Config config() @trusted
 {
     return _config;
-}
-
-void dumpExampleConfig() // TODO
-{
-	assert(false);
 }
 
 CLIResult parseCli(string[] args)
