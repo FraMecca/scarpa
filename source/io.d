@@ -4,6 +4,7 @@ import std.exception: enforce;
 import std.typecons : Tuple, tuple;
 import std.conv : to;
 
+import url : URL, parseURL, percentDecode;
 import vibe.core.file;
 import vibe.core.path;
 import ddash.functional : cond;
@@ -188,7 +189,6 @@ alias FileContent = SumType!(FilePayload, HTMLPayload);
  * Either fetch the entire content as a string if it is an HTML page
  * or return an OutputRange containing binary data
  */
-import urllib;
 FileContent requestUrl(const URL url, bool isAsset) @trusted
 {
     // TODO: accept all certificates

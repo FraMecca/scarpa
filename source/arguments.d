@@ -6,6 +6,7 @@ import parse;
 import sdlang;
 import simpleconfig;
 import sumtype;
+import url : URL, parseURL;
 
 import std.exception : enforce;
 import std.string;

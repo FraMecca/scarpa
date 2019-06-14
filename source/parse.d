@@ -4,10 +4,10 @@ import scarpa;
 import arguments : config;
 import io;
 import logger;
-import urllib;
 
 import ddash.functional : cond;
 import sumtype : match, SumType;
+import url : URL, parseURL;
 
 import std.typecons : Tuple, tuple;
 import std.algorithm.searching : startsWith, endsWith;

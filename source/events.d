@@ -3,7 +3,6 @@ module events;
 import parse;
 import arguments : config;
 import logger;
-import urllib;
 import io;
 import scarpa : assertFail;
 
@@ -12,6 +11,7 @@ import ddash.functional : cond;
 import ddash.utils : Expect;
 import requests;
 import vibe.core.file : FileStream;
+import url : URL, parseURL;
 
 import std.stdio : writeln;
 import std.conv : to;
