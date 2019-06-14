@@ -2,55 +2,55 @@ module arguments;
 
 import logger;
 import parse;
+import io;
 
 import sdlang;
 import simpleconfig;
 import sumtype;
+import ddash : cond;
 import url : URL, parseURL;
+import vibe.core.file : writeFile;
 
 import std.exception : enforce;
 import std.string;
 import std.range;
 import std.traits;
-
-import std.stdio : writeln;
+import std.algorithm.searching : canFind;
+import std.conv : to;
 
 struct NEW_PROJECT {};
 struct RESUME_PROJECT {};
-struct EXAMPLE_CONF {};
+struct DUMP_CONF {};
 struct HELP_WANTED {};
 struct NO_ARGS {};
 struct ARGS_ERROR { string error; };
 
-alias CLIResult = SumType!(NEW_PROJECT, RESUME_PROJECT, EXAMPLE_CONF, HELP_WANTED,
+alias CLIResult = SumType!(NEW_PROJECT, RESUME_PROJECT, DUMP_CONF, HELP_WANTED,
                            NO_ARGS, ARGS_ERROR);
 
 ///
 struct Config {
+	@cli("init")
+	bool init = false;
+    @cli("directory|d")
+    string projdir; // considered project name
+    @cli("resume|R")
+    bool resume = false;
+
     @cli("max-response-size") @cfg("max-response-size")
 	long maxResSize = 8 * 1024 * 1024; // limits the size of the stream parsed in memory
-    @cli("parallel|P") @cfg("parallel")
+    @cli("parallel") @cfg("parallel")
 	int maxEvents = 64; // number of events processed concurrently
     @cli("check-after-save") @cfg("check-after-save")
 	bool checkFileAfterSave = true; // after a file is saved, check if it is HTML and parse it again
-    @cli("resume|R")
-    bool resume = false;
-    @cli("directory|d")
-    string projdir; // considered project name
     @cli("url|u") @cfg("url")
     string rootUrl;
-    @cli("speed|s") @cfg("speed")
+    @cli("speed") @cfg("speed")
     long kbps;
-    @cli("log|l") @cfg("log")
+    @cli("log") @cfg("log")
     string log = "scarpa.log";
-    @cli("rules|r") @cfg("rules")
+    @cli("rules") @cfg("rules")
     string ruleFile = "rules.sdl";
-    @cli("url-all") @cfg("all")
-    long allUrlsRule = 0;
-    @cli("url-domain") @cfg("domain")
-    long domainRule = 0;
-    @cli("url-subdomain") @cfg("subdomain")
-    long subdomainRule = 0;
 
     URLRule[] rules;
     CLIResult action;
@@ -133,12 +133,7 @@ CLIResult parseCli(string[] args)
 
 	if(args.length <= 1) return CLIResult(NO_ARGS());
 
-    Config c;
-    scope(success)
-        _config = c;
+    readConfiguration(_config);
 
-    readConfiguration(c);
-
-
-	return c.action;
+	return _config.action;
 }

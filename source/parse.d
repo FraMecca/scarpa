@@ -56,7 +56,7 @@ alias parseResult = tuple!("url", "fname");
  * Parse an URL and
  * return a tuple of URL, pathname
  */
-ParseResult url_and_path(const string url, const URL absRooturl) @safe pure
+ParseResult urlAndPath(const string url, const URL absRooturl) @safe pure
 in{
     assert(url.startsWith("http://") || url.startsWith("https://") || url.startsWith("/"), url);
     assert(absRooturl.fragment == "");
@@ -71,6 +71,7 @@ do{
     } else {
         src = url.parseURL;
     }
+
     src = src.removeAnchor;
 
 	dst = toFileName(src, absRooturl);
@@ -222,7 +223,7 @@ bool isHTMLFile(Path path) @safe pure
 /**
  * Convenience struct for values that must be computed every time
  */
-struct URLRule{
+struct URLRule {
     import std.array : array;
 
     SumType!(URL, Regex!char) rule;

@@ -4,6 +4,7 @@ import events;
 import logger;
 import arguments : config;
 import scarpa : assertFail;
+import io;
 
 import d2sqlite3;
 import sumtype;
@@ -249,6 +250,11 @@ struct Storage {
 		return queue.front;
 	}
 
+    /**
+     * Check if this event should be added to the storage or not.
+     * Done by checking if the event is already in the db,
+     * or if it is an event grabbed during the resume phase.
+     */ 
 	@property bool toSkip(Event ev) @safe
 	{
 		if(db.testEvent(ev))

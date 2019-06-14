@@ -175,7 +175,7 @@ auto firstEvent(string rootUrl)
 
 alias ID = UUID;
 
-private void append(E)(ref EventRange res, E e) @safe
+void append(E)(ref EventRange res, E e) @safe
 {
     auto ee = makeEvent!(e);
 	res ~= ee;
@@ -288,7 +288,7 @@ struct HTMLEvent {
         URLRule currentRule = findRule(url, config.rules);
 
         string replaceUrl(const string href, const string tag, ref Node node){
-            auto tup = url_and_path(node[href].get(), url);
+            auto tup = urlAndPath(node[href].get(), url);
 
             m_level.match!((Asset a) {},
                            (StopRecur d) {},
@@ -307,7 +307,6 @@ struct HTMLEvent {
         }
 
         bool commentOut(const string tag, ref Node node)
-        // out(res){ debug{ writeln(res, " ", tag); }} do
         {
             // there are links such as dns-prefetch
             // that are useful to full fledged browser but
@@ -421,7 +420,7 @@ struct ToFileEvent
 	@property const string toString() @safe
 	{
 		return "ToFileEvent(basedir: " ~ config.projdir ~ ", file: " ~ m_fname
-            ~ " url:" ~ url.toHumanReadableString ~ ")";
+            ~ ", url:" ~ url.toHumanReadableString ~ ")";
 	}
 }
 

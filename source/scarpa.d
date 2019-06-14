@@ -11,6 +11,9 @@ import storage;
 import events;
 import logger;
 
+import vibe.core.concurrency;
+import std.algorithm.iteration : each, filter;
+
 // TODO: user agent
 
 /**
@@ -45,9 +48,9 @@ int main(string[] args)
 	parseCli(args)
         .match!((HELP_WANTED r) {},
                 (ARGS_ERROR r) { stderr.writeln(r.error); exitCode = 2; },
-                (EXAMPLE_CONF r) { dumpExampleConfig(); },
-                (NEW_PROJECT r) { startProject(); },
-                (RESUME_PROJECT r) { writeln("Resume this project"); }, // TODO import data from db
+                (DUMP_CONF r) { dumpInitConfig(); },
+				(NEW_PROJECT r) { startProject(); },
+                (RESUME_PROJECT r) { resumeProject(); }, // TODO import data from db
                 (NO_ARGS r) { stderr.writeln("No arguments specified"); exitCode = 1; }
         );
 
@@ -56,13 +59,11 @@ int main(string[] args)
 
 void startProject()
 {
-    import std.algorithm.iteration : each, filter;
     import std.range;
 
-    import vibe.core.concurrency;
     import vibe.core.task;
     import ddash.functional : cond;
-    import ddash.utils : Expect, Unexpected, match;
+    import ddash.utils : Expect, Unexpected, dmatch = match;
 
 	enableLogging(config.log);
 
@@ -84,14 +85,12 @@ void startProject()
 		cntEvents--;
 		storage.tasks[uuid]
 			.getResult()
-			.match!( // match from ddash, not sumtype
-					(EventRange r) {
-						r.each!(e => storage.put(e)); // enqueue
-					},
-					(Unexpected!string s) {
-						logException(s);
-					},
-			);
+            .dmatch!((EventRange r) {
+                    r.each!(e => storage.put(e)); // enqueue
+                },
+                (Unexpected!string s) {
+                    logException(s);
+                });
 		storage.tasks.remove(uuid);
 	}
 }
