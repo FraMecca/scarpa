@@ -58,7 +58,7 @@ alias parseResult = tuple!("url", "fname");
  */
 ParseResult urlAndPath(const string url, const URL absRooturl) @safe pure
 in{
-    assert(url.startsWith("http://") || url.startsWith("https://") || url.startsWith("/"), url);
+    assert(!url.empty);
     assert(absRooturl.fragment == "");
 }
 do{
@@ -68,8 +68,11 @@ do{
     if(url.startsWith("/")){
         src = absRooturl.toString.parseURL;
         src.path = url;
-    } else {
+    } else if(url.startsWith("http://") || url.startsWith("https://")) {
         src = url.parseURL;
+    } else {
+        src = absRooturl.toString.parseURL;
+        src.path = "/" ~ url;
     }
 
     src = src.removeAnchor;
@@ -190,11 +193,18 @@ unittest{
 */
 bool isValidHref(const string href) @safe pure
 {
+    /* There are pages that have href such as this:
+     * <a class="btn" href="archive.html">Archive</a>
+     * This is very confusing because the link does not start with "/"
+     * return true as default and fail later with 404 (hopefully)
+     */
     return href.cond!(h => h.startsWith("#"), false,
-                      h => h.startsWith("/"), true,
-                      h => h.startsWith("http://"), true,
-                      h => h.startsWith("https://"), true,
-                      false);
+                      // h => h.startsWith("/"), true,
+                      // h => h.startsWith("http://"), true,
+                      // h => h.startsWith("https://"), true,
+                      true);
+}
+
 /** Check if http resource is newer 
  * than what scarpa scraped last time
  */
