@@ -332,7 +332,6 @@ URLRule findRule(const URL src, URLRule[] rules) @safe
 }
 
 unittest{
-
     URLRule[] rules;
     rules ~= URLRule("fragal.eu", 2, false);
     rules ~= URLRule("https://.*.fragal.eu", 1, true);

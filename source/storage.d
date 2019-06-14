@@ -72,8 +72,10 @@ void insertEvent(ref Database db, Event e) @trusted
           (const ToFileEvent _ev) => true,
     ));
 	statement.bind(":uuid", uuid);
+    statement.bind(":level", e.level);
 	statement.bind(":parent", parent);
 	statement.bind(":data", e.toJson.toString());
+    statement.bind(":timestamp", currentTime());
 
 	statement.execute();
 	statement.reset(); // Need to reset the statement after execution.
@@ -148,6 +150,24 @@ bool isResolved(ref Database db, Event ev) @trusted
 
 	return res;
 }
+
+RequestEvent asRequestEvent(Row row) @trusted
+{
+    import std.json : parseJSON;
+    import std.uuid;
+    import std.conv : to;
+    import url : parseURL;
+    import parse;
+
+    assert(row["parent"].as!string !is null, "Row with null values");
+
+    auto level = Level(row["level"].as!int);
+    auto j = parseJSON(row["data"].as!string);
+    auto url = j["url"].str.parseURL;
+    ID parent = row["parent"].as!string.parseUUID;
+    return RequestEvent(url, level, parent, true);
+}
+
 
 void setResolved(ref Database db, Event ev) @trusted
 {
@@ -230,10 +250,13 @@ struct Storage {
 	BinnedPQ queue;
 	Tid mainTid;
 
-	this(const string location, Event first, Tid tid) @safe
+	this(const string location, Event[] firsts, Tid tid, bool newDB) @trusted
 	{
-		db = createDB(location);
-		queue.put(first);
+        if(newDB)
+            db = createDB(location);
+        else 
+            db = Database(location);
+        firsts.each!(f => queue.put(f));
 		mainTid = tid;
 	}
 
@@ -257,7 +280,9 @@ struct Storage {
      */ 
 	@property bool toSkip(Event ev) @safe
 	{
-		if(db.testEvent(ev))
+        auto isResumed = ev.match!((RequestEvent r) => r.m_resumed,
+                                      (_) => false);
+		if(!isResumed && db.testEvent(ev))
             return true;
 		else
             return false;
@@ -286,6 +311,11 @@ struct Storage {
 	void fire(Event ev) @trusted
 	{
 		ev.match!((LogEvent l) {},
+                  (RequestEvent r) {
+                      assert(!toSkip(ev));
+                      if(!r.m_resumed) // a new event
+                          db.insertEvent(ev);
+                  },
                   (_) {
                       assert(!toSkip(ev));
                       db.insertEvent(ev);
@@ -307,4 +337,21 @@ struct Storage {
         assert(uuid !in tasks, "duplicate uuid generated");
 		tasks[uuid] = task;
 	}
+
+    Event[] unresolvedEvents() @trusted
+    {
+        auto eventType = EventType.RequestEvent;
+        Statement statement = db.prepare(
+                                         "SELECT * FROM Event where resolved = 0 
+                    AND type = :eventType");
+        statement.bind(":eventType", eventType);
+        auto reqs = statement.execute();
+        statement.reset();
+        Event[] ret;
+
+        assert(reqs.front.peek!string(0) is null);
+        reqs.popFront; // found while debugging that first row is always null
+        reqs.each!((Row r) => ret.append(r.asRequestEvent));
+        return ret;
+    }
 }

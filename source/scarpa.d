@@ -59,16 +59,31 @@ int main(string[] args)
 
 void startProject()
 {
+	enableLogging(config.log);
+	auto first = firstEvent(config.rootUrl);
+	auto storage = Storage(config.projdir ~ "/scarpa.db", [first], thisTid, true);
+    work(storage);
+}
+
+void resumeProject()
+{
+	enableLogging(config.log);
+    // TODO: maybe more eloquent
+	auto storage = Storage(config.projdir ~ "/scarpa.db", [], thisTid, false);
+    immutable firsts = storage.unresolvedEvents();
+    firsts.each!(e => storage.put(e));
+    work(storage);
+}
+
+void work(ref Storage storage)
+{
     import std.range;
 
     import vibe.core.task;
     import ddash.functional : cond;
     import ddash.utils : Expect, Unexpected, dmatch = match;
 
-	enableLogging(config.log);
 
-	auto first = firstEvent(config.rootUrl);
-	auto storage = Storage(config.projdir ~ "/scarpa.db", first, thisTid);
 	auto maxEvents = config.maxEvents;
 	uint cntEvents;
 

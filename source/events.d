@@ -103,6 +103,19 @@ struct _Event{
             (const ToFileEvent _ev) => _ev.uuid);
     }
 
+    const level() @safe
+    {
+        enum levMatch = "_ev.m_level.match!((Asset a) => -1,
+                                 (int i) => i,
+                                 (StopRecur d) => -2)";
+        return ev.match!(
+			(const LogEvent _ev) => assertFail!int("LogEvent"),
+            (const RequestEvent _ev) => mixin(levMatch),
+            (const HTMLEvent _ev) => mixin(levMatch),
+            (const ToFileEvent _ev) => mixin(levMatch));
+        // TODO  substitute above match like this
+    }
+
     const EventResult resolve() @safe
     {
 		try {
@@ -209,11 +222,13 @@ struct RequestEvent {
     const Level m_level;
     const Base base;
     alias base this;
+    bool m_resumed;
 
-	this(inout URL url, Level lev, const ID parent = ID()) @safe
+	this(inout URL url, Level lev, const ID parent, bool resumed = false) @safe
 	{
         base = Base(url, parent, md5UUID(url.toString ~ "REQUEST"));
         m_level = lev;
+        m_resumed = resumed;
 	}
 
 	/**
