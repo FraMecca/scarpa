@@ -46,16 +46,17 @@ auto createDB(const string location) @trusted
   * HTML/FILE events are always the result of a single request event.
   * Request events need to be marked as `over` when
   * its only grandchild (ToFileEvent) is resolved.
+  * Timestamp is added at insertion.
 */
 void insertEvent(ref Database db, Event e) @trusted
 {
 	auto data = e.toJson.toString();
-	auto parent = e.parent.isNull ? "" : e.parent.get.toString;
-	auto uuid = e.uuid.get.toString;
+	auto parent = e.parent.toString;
+	auto uuid = e.uuid.toString;
 
 	Statement statement = db.prepare(
-        "INSERT INTO Event (type, resolved, uuid, parent, data)
-        VALUES (:type, :resolved, :uuid, :parent, :data)"
+        "INSERT INTO Event (type, resolved, uuid, parent, data, level, timestamp)
+        VALUES (:type, :resolved, :uuid, :parent, :data, :level, :timestamp)"
     );
 	statement.bind(":type", e.match!(
           (inout LogEvent _ev) => assertFail!EventType(),
@@ -110,7 +111,7 @@ void insertEvent(ref Database db, Event e) @trusted
  */
 bool testEvent(ref Database db, Event ev) @trusted
 {
-	auto uuid = ev.uuid.get;
+	auto uuid = ev.uuid;
 	Statement statement = db.prepare(
 			"SELECT EXISTS(SELECT 1
 				FROM Event
@@ -130,7 +131,7 @@ bool testEvent(ref Database db, Event ev) @trusted
  */
 bool isResolved(ref Database db, Event ev) @trusted
 {
-	auto uuid = ev.uuid.get;
+	auto uuid = ev.uuid;
 
 	Statement statement = db.prepare(
 			"SELECT EXISTS(SELECT 1
@@ -152,7 +153,7 @@ void setResolved(ref Database db, Event ev) @trusted
     ev.match!((LogEvent l) { assert(false, "LogEvent should not be setResolved"); },
               (_) {}
     );
-    auto uuid = ev.uuid.get;
+    auto uuid = ev.uuid;
 
 	Statement statement = db.prepare(
 			"UPDATE Event
@@ -285,7 +286,7 @@ struct Storage {
                   }
         );
 
-		immutable uuid = ev.uuid.get.toString;
+		immutable uuid = ev.uuid.toString;
 
 		auto go() {
 			auto results = ev.resolve();

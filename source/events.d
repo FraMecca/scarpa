@@ -126,7 +126,7 @@ struct _Event{
 
 	auto hashOf() @safe
 	{
-		return this.uuid.get.toString;
+		return this.uuid.toString;
 	}
 
     debug{
@@ -166,12 +166,14 @@ template makeEvent(alias t)
  */
 auto firstEvent(string rootUrl)
 {
-    auto r = RequestEvent(rootUrl.parseURL, Level(0));
+    // mark the root url as parent of it self
+    auto parentOfItself = md5UUID(rootUrl ~ "REQUEST");
+    auto r = RequestEvent(rootUrl.parseURL, Level(0), parentOfItself);
 	Event req = makeEvent!(r);
     return req;
 }
 
-alias ID = Nullable!UUID;
+alias ID = UUID;
 
 private void append(E)(ref EventRange res, E e) @safe
 {
@@ -194,12 +196,6 @@ struct Base {
         this.parent = parent;
         this(url, uuid);
 	}
-
-	this(const URL url, const UUID parent, const UUID uuid) @safe
-	{
-        this.parent = parent;
-        this(url, uuid);
-    }
 
     private this(const URL url, const UUID uuid) @safe
     {
