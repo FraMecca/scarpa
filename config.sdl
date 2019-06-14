@@ -1,7 +1,0 @@
-rootUrl "http://fragal.eu"
-maxResSize 8388608
-
-rule "fragal.eu" 3 literal=true
-rule ".*" 0 regex=true
-
-checkfileaftersave true
