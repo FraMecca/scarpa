@@ -12,6 +12,7 @@ dependency "arrogant" version="~>0.2.0"
 dependency "d2sqlite3" version="~>0.18.1"
 dependency "sdlang-d" version="~>0.10.4"
 dependency "simpleconfig" version="*"
+dependency "urld" version="*"
 
 lflags "-lmagic"
 
