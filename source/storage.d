@@ -32,8 +32,10 @@ auto createDB(const string location) @trusted
            type integer,
 		   resolved integer not null,
            uuid varchar(16) not null unique,
-           parent text,
-           data text not null
+           parent varchar(16) not null,
+           data text not null,
+           level integer not null,
+           timestamp integer not null
           )";
     db.run(table);
     return db;
