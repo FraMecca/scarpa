@@ -250,3 +250,9 @@ bool fileExists(const Path fp)
     import vibe.core.file : existsFile;
     return existsFile(fp);
 }
+
+long currentTime() @safe
+{
+    import std.datetime.systime : Clock;
+    return Clock.currTime.toUnixTime;
+}

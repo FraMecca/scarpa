@@ -195,7 +195,17 @@ bool isValidHref(const string href) @safe pure
                       h => h.startsWith("http://"), true,
                       h => h.startsWith("https://"), true,
                       false);
+/** Check if http resource is newer 
+ * than what scarpa scraped last time
+ */
+bool isOutOfDate(string[string] headers, long last)
+{
+    return "last-modified" in headers &&
+            headers["last-modified"].unixTimestamp
+                                  .match!((long l) => l > last,
+                                          (InvalidUnixTime i) => true);
 }
+                              
 
 /**
  * Parse the HTTP headers
@@ -372,4 +382,28 @@ Level couldRecur(const URL url, const int lev, const URLRule current, const stri
 	}
 
 	return ret;
+}
+
+struct InvalidUnixTime {}
+alias UnixTime = SumType!(long, InvalidUnixTime); /// Possible return values for couldRecur
+/**
+ * convert RFC7231 format to unix timestamp
+ */
+UnixTime unixTimestamp(const string date) @safe
+{
+    import std.datetime : parseRFC822DateTime, SysTime, DateTimeException;
+
+    try{
+        alias parseDate = (const string d) => d.parseRFC822DateTime.toUnixTime;
+        return UnixTime(parseDate(date));
+    } catch (DateTimeException e){
+        return UnixTime(InvalidUnixTime());
+    }
+}
+
+@safe unittest{
+    import std.datetime : unixTimeToStdTime;
+    assert("Tue, 15 Nov 1994 08:12:31 GMT".unixTimestamp == UnixTime(784887151));
+    assert("Sun, 06 Jan 2019 00:00:12 GMT".unixTimestamp == UnixTime(1546732812));
+    assert("00:00:12 GMT".unixTimestamp == UnixTime(InvalidUnixTime()));
 }
