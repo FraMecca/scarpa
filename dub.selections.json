@@ -1,7 +1,7 @@
 {
 	"fileVersion": 1,
 	"versions": {
-		"arrogant": "0.2.0",
+		"arrogant": "0.3.0",
 		"bolts": "0.11.1",
 		"botan": "1.12.10",
 		"botan-math": "1.0.3",
