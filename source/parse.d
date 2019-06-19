@@ -67,19 +67,19 @@ do{
     // write full path in case of relative urls
     if(url.startsWith("/")){
         src = absRooturl.toString.parseURL;
-        src.path = url;
+        src.path = absRooturl.path ~ url;
     } else if(url.startsWith("http://") || url.startsWith("https://")) {
         src = url.parseURL;
     } else {
         src = absRooturl.toString.parseURL;
-        src.path = "/" ~ url;
+        src.path = absRooturl.path ~ url;
     }
 
     src = src.removeAnchor;
 
 	dst = toFileName(src, absRooturl);
     return parseResult(src, dst);
-}
+ } // TODO write tests
 
 alias segments = (inout string s) => s.split('/').filter!(i => i != "");
 /**
