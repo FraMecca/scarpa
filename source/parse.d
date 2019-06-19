@@ -62,24 +62,41 @@ in{
     assert(absRooturl.fragment == "");
 }
 do{
-    string dst;
+    auto src = constructUrl(url, absRooturl);
+	auto dst = toFileName(src, absRooturl);
+    return parseResult(src, dst);
+ }
+
+URL constructUrl(const string url, const URL absRooturl) @safe pure
+{
     URL src;
     // write full path in case of relative urls
+    auto path = absRooturl.path;
     if(url.startsWith("/")){
         src = absRooturl.toString.parseURL;
-        src.path = absRooturl.path ~ url;
+        src.path = url;
     } else if(url.startsWith("http://") || url.startsWith("https://")) {
         src = url.parseURL;
     } else {
         src = absRooturl.toString.parseURL;
-        src.path = absRooturl.path ~ url;
+        src.path = (path.endsWith("/") ? path : path ~ "/") ~ url;
     }
 
     src = src.removeAnchor;
 
-	dst = toFileName(src, absRooturl);
-    return parseResult(src, dst);
- } // TODO write tests
+    return src;
+}
+
+unittest{
+    assert(constructUrl("/about", "https://fragal.eu/".parseURL) == "https://fragal.eu/about");
+    assert(constructUrl("/about", "https://fragal.eu".parseURL) == "https://fragal.eu/about");
+    assert(constructUrl("/about/", "https://fragal.eu/".parseURL) == "https://fragal.eu/about/");
+    assert(constructUrl("/a/about", "https://fragal.eu/".parseURL) == "https://fragal.eu/a/about");
+    assert(constructUrl("about", "https://fragal.eu/a".parseURL) == "https://fragal.eu/a/about");
+    assert(constructUrl("about", "https://fragal.eu/a/".parseURL) == "https://fragal.eu/a/about");
+    assert(constructUrl("/about", "https://fragal.eu/a".parseURL) == "https://fragal.eu/about");
+    assert(constructUrl("http://francescomecca.eu", "https://fragal.eu/".parseURL) == "http://francescomecca.eu/");
+}
 
 alias segments = (const string s) => s.split('/').filter!(i => i != "");
 /**
