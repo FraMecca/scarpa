@@ -39,7 +39,7 @@ struct _Event{
     this(ToFileEvent e) @safe { ev = e; }
 	this(LogEvent e) @safe { ev = e; }
 
-	@property inout string toString() @safe
+	@property const string toString() @safe
 	{
 		return ev.toString;
 	}
@@ -51,21 +51,21 @@ struct _Event{
 					 (StopRecur a) => "donotrecur");`;
 
         return ev.match!(
-			(inout LogEvent _ev) {
+			(const LogEvent _ev) {
 				return assertFail!JSONValue("LogEvent should not be serialized");
 			},
-            (inout RequestEvent _ev) {
+            (const RequestEvent _ev) {
                 auto j = JSONValue();
                 j["url"] = _ev.url.toString;
                 mixin(levelString);
                 return j;},
-            (inout HTMLEvent _ev) {
+            (const HTMLEvent _ev) {
                 auto j = JSONValue();
                 j["url"] = _ev.url.toString;
                 mixin(levelString);
                 return j;
             },
-            (inout ToFileEvent _ev) {
+            (const ToFileEvent _ev) {
                 auto j = JSONValue();
                 j["fname"] = _ev.m_fname;
                 j["url"] = _ev.url.toString;
@@ -120,10 +120,10 @@ struct _Event{
     {
 		try {
 			return typeof(return).expected(ev.match!(
-					(inout LogEvent _ev) => _ev.resolve(),
-					(inout RequestEvent _ev) => _ev.resolve(),
-					(inout HTMLEvent _ev) => _ev.resolve(),
-					(inout ToFileEvent _ev) => _ev.resolve()));
+					(const LogEvent _ev) => _ev.resolve(),
+					(const RequestEvent _ev) => _ev.resolve(),
+					(const HTMLEvent _ev) => _ev.resolve(),
+					(const ToFileEvent _ev) => _ev.resolve()));
 		} catch (Exception e) {
             immutable urlh = url.toHumanReadableString;
             debug{
@@ -224,7 +224,7 @@ struct RequestEvent {
     alias base this;
     bool m_resumed;
 
-	this(inout URL url, Level lev, const ID parent, bool resumed = false) @safe
+	this(const URL url, Level lev, const ID parent, bool resumed = false) @safe
 	{
         base = Base(url, parent, md5UUID(url.toString ~ "REQUEST"));
         m_level = lev;

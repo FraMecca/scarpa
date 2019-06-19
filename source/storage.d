@@ -60,15 +60,15 @@ void insertEvent(ref Database db, Event e) @trusted
         VALUES (:type, :resolved, :uuid, :parent, :data, :level, :timestamp)"
     );
 	statement.bind(":type", e.match!(
-          (inout LogEvent _ev) => assertFail!EventType(),
-          (inout RequestEvent _ev) => EventType.RequestEvent,
-          (inout HTMLEvent _ev) => EventType.HTMLEvent,
-          (inout ToFileEvent _ev) => EventType.ToFileEvent,
+          (const LogEvent _ev) => assertFail!EventType(),
+          (const RequestEvent _ev) => EventType.RequestEvent,
+          (const HTMLEvent _ev) => EventType.HTMLEvent,
+          (const ToFileEvent _ev) => EventType.ToFileEvent,
     ));
 	statement.bind(":resolved", e.match!(
-          (inout LogEvent _ev) => assertFail!bool(),
-          (inout RequestEvent _ev) => false,
-          (inout HTMLEvent _ev) => true,
+          (const LogEvent _ev) => assertFail!bool(),
+          (const RequestEvent _ev) => false,
+          (const HTMLEvent _ev) => true,
           (const ToFileEvent _ev) => true,
     ));
 	statement.bind(":uuid", uuid);
@@ -102,10 +102,10 @@ void insertEvent(ref Database db, Event e) @trusted
     }
 
 	e.match!(
-			 (inout LogEvent _ev) {},
-             (inout RequestEvent _ev) {},
-             (inout HTMLEvent _ev) {},
-             (inout ToFileEvent _ev) { updateGrandParent(db, e.parent); },
+			 (const LogEvent _ev) {},
+             (const RequestEvent _ev) {},
+             (const HTMLEvent _ev) {},
+             (const ToFileEvent _ev) { updateGrandParent(db, e.parent); },
     );
 }
 
@@ -226,7 +226,7 @@ struct BinnedPQ {
 	{
 		ev.match!((RequestEvent e) => bins[EventType.RequestEvent] ~= makeEvent!e,
 				  (HTMLEvent e) => bins[EventType.HTMLEvent] ~= makeEvent!e,
-				  (inout ToFileEvent e) => bins[EventType.ToFileEvent] ~= makeEvent!e,
+				  (const ToFileEvent e) => bins[EventType.ToFileEvent] ~= makeEvent!e,
 				  (LogEvent e) => null //=> bins[EventType.LogEvent] ~= makeEvent!e
 		);
 	}

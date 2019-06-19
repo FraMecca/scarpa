@@ -81,7 +81,7 @@ do{
     return parseResult(src, dst);
  } // TODO write tests
 
-alias segments = (inout string s) => s.split('/').filter!(i => i != "");
+alias segments = (const string s) => s.split('/').filter!(i => i != "");
 /**
  * Converts an URL to a path on the disk
  * relatively to the source that points to the URL
@@ -252,7 +252,7 @@ struct URLRule {
     ulong length;
     string[] segment;
 
-    this(const string ur, inout long lev, bool isRgx) @safe {
+    this(const string ur, const long lev, bool isRgx) @safe {
         import std.string : startsWith;
         isRgx.cond!(true, { rule = regex(ur); },
                     false, { rule = ur.parseURL; });
@@ -269,28 +269,28 @@ struct URLRule {
 
     const int providedPort() @safe
     {
-        return rule.match!((inout URL u) => u.providedPort,
+        return rule.match!((const URL u) => u.providedPort,
                            (_) => 0);
     }
 
     const int port() @safe
     {
-        return rule.match!((inout URL u) => u.port,
+        return rule.match!((const URL u) => u.port,
                            (_) => 0);
     }
 
     string host() @safe
     {
-        return rule.match!((inout URL u) => u.host,
+        return rule.match!((const URL u) => u.host,
                            (_) => assertFail!string("was a regex type"));
     }
 
     const bool matches(const URL url) @safe
     {
         import std.regex : matchFirst;
-        return rule.match!((inout URL u)  { return url.host == u.host &&
+        return rule.match!((const URL u)  { return url.host == u.host &&
                     (isRelative || (url.scheme == u.scheme && u.port == url.port)); },
-            (inout Regex!char rgx) => !!url.toString.matchFirst(rgx));
+            (const Regex!char rgx) => !!url.toString.matchFirst(rgx));
     }
 }
 
